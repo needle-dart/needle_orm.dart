@@ -1,0 +1,11 @@
+name: needle_orm
+description: Orm for Needle framework.
+version: 0.0.1
+homepage: https://github.com/outersky/needle_orm.dart
+
+environment:
+  sdk: ">=2.12.0 <3.0.0"
+
+dependencies:
+  
+dev_dependencies:
