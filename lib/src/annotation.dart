@@ -18,7 +18,23 @@ abstract class OrmClassAnnotation {}
 class Entity extends OrmAnnotation {
   // name
 
-  const Entity() : super(AnnotationTarget.Class);
+  final String? beforeInsert;
+  final String? beforeUpdate;
+  final String? beforeDelete;
+  final String? afterInsert;
+  final String? afterUpdate;
+  final String? afterDelete;
+  final String? afterLoad;
+
+  const Entity(
+      {this.beforeInsert,
+      this.beforeUpdate,
+      this.beforeDelete,
+      this.afterInsert,
+      this.afterUpdate,
+      this.afterDelete,
+      this.afterLoad})
+      : super(AnnotationTarget.Class);
 }
 
 class DB extends OrmAnnotation {
