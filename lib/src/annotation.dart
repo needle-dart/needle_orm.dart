@@ -21,22 +21,22 @@ class Entity extends OrmAnnotation {
   final String? beforeInsert;
   final String? beforeUpdate;
   final String? beforeDelete; // respect @SoftDelete
-  final String? beforeDeletePermant;
+  final String? beforeDeletePermanent;
   final String? afterInsert;
   final String? afterUpdate;
   final String? afterDelete; // respect @SoftDelete
-  final String? afterDeletePermant;
+  final String? afterDeletePermanent;
   final String? afterLoad;
 
   const Entity(
       {this.beforeInsert,
       this.beforeUpdate,
       this.beforeDelete,
-      this.beforeDeletePermant,
+      this.beforeDeletePermanent,
       this.afterInsert,
       this.afterUpdate,
       this.afterDelete,
-      this.afterDeletePermant,
+      this.afterDeletePermanent,
       this.afterLoad})
       : super(AnnotationTarget.Class);
 }
