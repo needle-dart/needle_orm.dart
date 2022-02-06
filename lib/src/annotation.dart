@@ -18,26 +18,26 @@ abstract class OrmClassAnnotation {}
 class Entity extends OrmAnnotation {
   // name
 
-  final String? beforeInsert;
-  final String? beforeUpdate;
-  final String? beforeDelete; // respect @SoftDelete
-  final String? beforeDeletePermanent;
-  final String? afterInsert;
-  final String? afterUpdate;
-  final String? afterDelete; // respect @SoftDelete
-  final String? afterDeletePermanent;
-  final String? afterLoad;
+  final String? prePersist;
+  final String? preUpdate;
+  final String? preRemove; // respect @SoftDelete
+  final String? preRemovePermanent;
+  final String? postPersist;
+  final String? postUpdate;
+  final String? postRemove; // respect @SoftDelete
+  final String? postRemovePermanent;
+  final String? postLoad;
 
   const Entity(
-      {this.beforeInsert,
-      this.beforeUpdate,
-      this.beforeDelete,
-      this.beforeDeletePermanent,
-      this.afterInsert,
-      this.afterUpdate,
-      this.afterDelete,
-      this.afterDeletePermanent,
-      this.afterLoad})
+      {this.prePersist,
+      this.preUpdate,
+      this.preRemove,
+      this.preRemovePermanent,
+      this.postPersist,
+      this.postUpdate,
+      this.postRemove,
+      this.postRemovePermanent,
+      this.postLoad})
       : super(AnnotationTarget.Class);
 }
 
