@@ -1,8 +1,12 @@
 // see javax.persistence.*
 
+abstract class Model {}
+
 abstract class OrmAnnotation {
   final AnnotationTarget _target;
   const OrmAnnotation(this._target);
+  bool isServerSide(ActionType actionType) => false;
+  String serverSideExpr(ActionType actionType) => '';
 }
 
 enum AnnotationTarget {
@@ -13,10 +17,16 @@ enum AnnotationTarget {
   None,
 }
 
+enum ActionType { Insert, Update, Delete }
+
 abstract class OrmClassAnnotation {}
 
 class Entity extends OrmAnnotation {
-  // name
+  //
+  static const DEFAULT_DS = 'defaultDS';
+
+  // final String? name;
+  final String? ds; // DataSource name
 
   final String? prePersist;
   final String? preUpdate;
@@ -29,7 +39,8 @@ class Entity extends OrmAnnotation {
   final String? postLoad;
 
   const Entity(
-      {this.prePersist,
+      {this.ds = DEFAULT_DS,
+      this.prePersist,
       this.preUpdate,
       this.preRemove,
       this.preRemovePermanent,
@@ -39,11 +50,6 @@ class Entity extends OrmAnnotation {
       this.postRemovePermanent,
       this.postLoad})
       : super(AnnotationTarget.Class);
-}
-
-class DB extends OrmAnnotation {
-  final String name; // will lookup this db name in Context
-  const DB({this.name = 'default'}) : super(AnnotationTarget.Class);
 }
 
 class Table extends OrmAnnotation {
@@ -128,6 +134,10 @@ class OneToOne extends OrmAnnotation {
   const OneToOne() : super(AnnotationTarget.Field);
 }
 
+class ManyToMany extends OrmAnnotation {
+  const ManyToMany() : super(AnnotationTarget.Field);
+}
+
 class OrderBy extends OrmAnnotation {
   final String value;
   // fetch
@@ -182,10 +192,27 @@ class SoftDelete extends OrmAnnotation {
 
 class WhenCreated extends OrmAnnotation {
   const WhenCreated() : super(AnnotationTarget.Field);
+
+  @override
+  bool isServerSide(ActionType actionType) =>
+      actionType == ActionType.Insert ? true : false;
+  @override
+  String serverSideExpr(ActionType actionType) =>
+      actionType == ActionType.Insert ? 'now()' : '';
 }
 
 class WhenModified extends OrmAnnotation {
   const WhenModified() : super(AnnotationTarget.Field);
+  @override
+  bool isServerSide(ActionType actionType) =>
+      actionType == ActionType.Update || actionType == ActionType.Insert
+          ? true
+          : false;
+  @override
+  String serverSideExpr(ActionType actionType) =>
+      actionType == ActionType.Update || actionType == ActionType.Insert
+          ? 'now()'
+          : '';
 }
 
 class WhoCreated extends OrmAnnotation {
