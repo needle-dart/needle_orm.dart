@@ -33,23 +33,41 @@ abstract class SqlExecutor<T extends Model> {
 
   SqlExecutor(this.modelInspector, this.metaInfoClasses);
 
+  OrmMetaInfoClass? findClass(String entityClassName) {
+    var clz =
+        metaInfoClasses.where((element) => element.name == entityClassName);
+    if (clz.isEmpty) return null;
+    return clz.first;
+  }
+
   Iterable<OrmMetaInfoField> _serverSideFields(
       ActionType actionType, String entityClassName,
       [bool searchParents = false]) {
-    var clz =
-        metaInfoClasses.where((element) => element.name == entityClassName);
-    if (clz.isEmpty) return [];
-    var fields = clz.first.fields.where((element) => element.ormAnnotations
+    var clz = findClass(entityClassName);
+    if (clz == null) return [];
+    var fields = clz.fields.where((element) => element.ormAnnotations
         .any((element) => element.isServerSide(actionType)));
 
-    if (searchParents && clz.first.superClassName != null) {
+    if (searchParents && clz.superClassName != null) {
       return [
         ...fields,
-        ..._serverSideFields(
-            actionType, clz.first.superClassName!, searchParents)
+        ..._serverSideFields(actionType, clz.superClassName!, searchParents)
       ];
     }
     return fields;
+  }
+
+  Iterable<OrmMetaInfoField> _idFields(String entityClassName) {
+    var clz = findClass(entityClassName);
+    if (clz == null) return [];
+
+    var idFields = clz.fields.where((element) =>
+        element.ormAnnotations.any((element) => element.runtimeType == ID));
+    if (idFields.isNotEmpty) return idFields;
+    if (clz.superClassName != null) {
+      return _idFields(clz.superClassName!);
+    }
+    return [];
   }
 
   void insert(T entity) {
@@ -74,14 +92,44 @@ abstract class SqlExecutor<T extends Model> {
       ...ssFieldValues,
     ].join(',');
     var sql = 'insert into $tableName( $fieldNames ) values( $fieldVariables )';
-    print('SQL: $sql');
+    print('Insert SQL: $sql');
     query(tableName, sql, dirtyMap);
   }
 
   void update(T entity) {
-    var tableName = getTableName(modelInspector.getEntityClassName(entity));
-    print(
-        'update $tableName , fields: ${modelInspector.getDirtyFields(entity)}');
+    var action = ActionType.Update;
+    var entityClassName = modelInspector.getEntityClassName(entity);
+    var tableName = getTableName(entityClassName);
+    var dirtyMap = modelInspector.getDirtyFields(entity);
+
+    var idField = _idFields(entityClassName).first; // @TODO
+
+    var idValue = dirtyMap.remove(idField.name);
+
+    var ssFields = _serverSideFields(action, entityClassName, true);
+
+    var ssFieldNames = ssFields.map((e) => e.name);
+
+    var setClause = <String>[];
+
+    dirtyMap.keys.forEach((name) {
+      setClause.add('${getColumnName(name)}=@$name');
+    });
+
+    ssFields.forEach((field) {
+      var name = field.name;
+      var value = field.ormAnnotations
+          .firstWhere((element) => element.isServerSide(action))
+          .serverSideExpr(action);
+
+      setClause.add("${getColumnName(name)}=$value");
+    });
+
+    dirtyMap[idField.name] = idValue;
+    var sql =
+        'update $tableName set ${setClause.join(',')} where ${idField.name}=@${idField.name}';
+    print('Update SQL: $sql');
+    query(tableName, sql, dirtyMap);
   }
 
   void delete(T entity) {
