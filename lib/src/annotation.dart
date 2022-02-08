@@ -19,6 +19,14 @@ enum AnnotationTarget {
 
 enum ActionType { Insert, Update, Delete }
 
+abstract class AbstractModelQuery<T, D> {
+  AbstractModelQuery();
+
+  T? findById(D id);
+
+  List<T> findAll();
+}
+
 abstract class OrmClassAnnotation {}
 
 class Entity extends OrmAnnotation {

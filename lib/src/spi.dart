@@ -108,8 +108,6 @@ abstract class SqlExecutor<T extends Model> {
 
     var ssFields = _serverSideFields(action, entityClassName, true);
 
-    var ssFieldNames = ssFields.map((e) => e.name);
-
     var setClause = <String>[];
 
     dirtyMap.keys.forEach((name) {
@@ -152,6 +150,20 @@ abstract class SqlExecutor<T extends Model> {
     return ReCase(fieldName).snakeCase;
   }
 
+  E? findById<E extends Model>(dynamic id) {
+    var entityClassName = '$E';
+    var idFieldName = _idFields(entityClassName).first.name;
+    print('findById: ${E} [$id]');
+    E entity = modelInspector.newInstance('$E') as E;
+    modelInspector.setFieldValue(entity as T, idFieldName, id);
+    return entity;
+  }
+
+  List<E> findAll<E extends Model>() {
+    print('findAll: ${E} ');
+    return [];
+  }
+
   /// Executes a single query.
   Future<List<List>> query(
       String tableName, String sql, Map<String, dynamic> substitutionValues,
@@ -159,9 +171,31 @@ abstract class SqlExecutor<T extends Model> {
 }
 
 abstract class ModelInspector<T> {
+  T newInstance(String entityClassName);
   String getEntityClassName(T obj);
   Map<String, dynamic> getDirtyFields(T obj);
+  dynamic getFieldValue(T obj, String fieldName);
+  void setFieldValue(T obj, String fieldName, dynamic value);
 
   void loadEntity(T entity, Map<String, dynamic> m,
       {errorOnNonExistField: false});
+}
+
+abstract class BaseModelQuery<T extends Model, D>
+    extends AbstractModelQuery<T, D> {
+  final SqlExecutor sqlExecutor;
+
+  String get entityClassName;
+
+  BaseModelQuery(this.sqlExecutor);
+
+  @override
+  T? findById(D id) {
+    return sqlExecutor.findById<T>(id);
+  }
+
+  @override
+  List<T> findAll() {
+    return sqlExecutor.findAll<T>();
+  }
 }
