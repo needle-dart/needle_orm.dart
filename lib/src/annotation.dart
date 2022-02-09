@@ -22,9 +22,9 @@ enum ActionType { Insert, Update, Delete }
 abstract class AbstractModelQuery<T, D> {
   AbstractModelQuery();
 
-  T? findById(D id);
+  Future<T?> findById(D id);
 
-  List<T> findAll();
+  Future<List<T>> findAll();
 }
 
 abstract class OrmClassAnnotation {}
