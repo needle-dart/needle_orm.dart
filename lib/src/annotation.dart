@@ -130,7 +130,8 @@ class OneToMany extends OrmAnnotation {
   // fetch
   // mappedBy
   // orphanRemoval
-  const OneToMany() : super(AnnotationTarget.Field);
+  final String? mappedBy;
+  const OneToMany({this.mappedBy}) : super(AnnotationTarget.Field);
 }
 
 class OneToOne extends OrmAnnotation {
@@ -139,7 +140,8 @@ class OneToOne extends OrmAnnotation {
   // optional
   // mappedBy
   // orphanRemoval
-  const OneToOne() : super(AnnotationTarget.Field);
+  final String? mappedBy;
+  const OneToOne({this.mappedBy}) : super(AnnotationTarget.Field);
 }
 
 class ManyToMany extends OrmAnnotation {

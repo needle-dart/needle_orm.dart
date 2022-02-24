@@ -12,11 +12,25 @@ class OrmMetaInfoClass {
   final List<OrmAnnotation> ormAnnotations;
   final List<OrmMetaInfoField> fields;
 
+  String? _tableName;
+
   OrmMetaInfoClass(this.name,
       {this.superClassName,
       this.isAbstract = false,
       this.ormAnnotations = const [],
-      this.fields = const []});
+      this.fields = const []}) {
+    var tables = ormAnnotations.whereType<Table>();
+    if (tables.isNotEmpty) {
+      _tableName = tables.first.name;
+    }
+    _tableName = _tableName ?? _getTableName(this.name);
+  }
+
+  String get tableName => _tableName!;
+
+  String _getTableName(String className) {
+    return pluralize(ReCase(className).snakeCase);
+  }
 }
 
 class OrmMetaInfoField {
@@ -29,21 +43,13 @@ class OrmMetaInfoField {
 
 abstract class SqlExecutor<T extends Model> {
   ModelInspector<T> modelInspector;
-  List<OrmMetaInfoClass> metaInfoClasses;
 
-  SqlExecutor(this.modelInspector, this.metaInfoClasses);
-
-  OrmMetaInfoClass? findClass(String entityClassName) {
-    var clz =
-        metaInfoClasses.where((element) => element.name == entityClassName);
-    if (clz.isEmpty) return null;
-    return clz.first;
-  }
+  SqlExecutor(this.modelInspector);
 
   Iterable<OrmMetaInfoField> _serverSideFields(
       ActionType actionType, String entityClassName,
       [bool searchParents = false]) {
-    var clz = findClass(entityClassName);
+    var clz = modelInspector.metaInfo(entityClassName);
     if (clz == null) return [];
     var fields = clz.fields.where((element) => element.ormAnnotations
         .any((element) => element.isServerSide(actionType)));
@@ -61,7 +67,7 @@ abstract class SqlExecutor<T extends Model> {
       {String? entityClassName,
       OrmMetaInfoClass? clz,
       bool searchParents = false}) {
-    clz ??= findClass(entityClassName!);
+    clz ??= modelInspector.metaInfo(entityClassName!);
     if (clz == null) return [];
     return [
       ...clz.fields,
@@ -73,7 +79,7 @@ abstract class SqlExecutor<T extends Model> {
 
   Iterable<OrmMetaInfoField> _idFields(
       {String? entityClassName, OrmMetaInfoClass? clz}) {
-    clz ??= findClass(entityClassName!);
+    clz ??= modelInspector.metaInfo(entityClassName!);
 
     var fields = _fields(clz: clz, searchParents: true);
     return fields
@@ -85,7 +91,7 @@ abstract class SqlExecutor<T extends Model> {
     if (type.endsWith('?')) {
       type = type.substring(0, type.length - 1);
     }
-    return findClass(type) != null;
+    return modelInspector.metaInfo(type) != null;
   }
 
   void insert(T entity) {
@@ -117,7 +123,8 @@ abstract class SqlExecutor<T extends Model> {
   void update(T entity) {
     var action = ActionType.Update;
     var entityClassName = modelInspector.getEntityClassName(entity);
-    var tableName = getTableName(entityClassName);
+    var clz = modelInspector.metaInfo(entityClassName)!;
+    var tableName = clz.tableName;
     var dirtyMap = modelInspector.getDirtyFields(entity);
 
     var idField = _idFields(entityClassName: entityClassName).first; // @TODO
@@ -170,7 +177,7 @@ abstract class SqlExecutor<T extends Model> {
 
   Future<E?> findById<E extends T>(dynamic id) async {
     var entityClassName = '$E';
-    var clz = findClass(entityClassName)!;
+    var clz = modelInspector.metaInfo(entityClassName);
 
     var idFields = _idFields(clz: clz);
     var idFieldName = idFields.first.name;
@@ -205,7 +212,7 @@ abstract class SqlExecutor<T extends Model> {
 
   Future<List<E>> findAll<E extends T>() async {
     var entityClassName = '$E';
-    var clz = findClass(entityClassName)!;
+    var clz = modelInspector.metaInfo(entityClassName);
 
     var tableName = getTableName(entityClassName);
 
@@ -241,8 +248,10 @@ abstract class SqlExecutor<T extends Model> {
 }
 
 abstract class ModelInspector<T> {
-  T newInstance(String entityClassName);
   String getEntityClassName(T obj);
+  T newInstance(String entityClassName);
+  OrmMetaInfoClass? metaInfo(String entityClassName);
+  List<OrmMetaInfoClass> get allOrmMetaInfoClasses;
   Map<String, dynamic> getDirtyFields(T obj);
   dynamic getFieldValue(T obj, String fieldName);
   void setFieldValue(T obj, String fieldName, dynamic value);
