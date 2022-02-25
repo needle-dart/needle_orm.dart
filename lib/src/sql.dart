@@ -23,7 +23,7 @@ abstract class DataSource {
   ///
   /// Whether nested transactions are supported depends on the
   /// underlying driver.
-  // Future<T> transaction<T>(FutureOr<T> Function(DataSource) f);
+  Future<T> transaction<T>(FutureOr<T> Function(DataSource) f);
 }
 
 enum DatabaseType { MySQL, MariaDB, PostgreSQL, Sqlite }

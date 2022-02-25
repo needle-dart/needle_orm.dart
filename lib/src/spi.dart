@@ -5,17 +5,17 @@ import 'package:recase/recase.dart';
 
 import 'annotation.dart';
 
-class OrmMetaInfoClass {
+class OrmMetaClass {
   final String name;
   final String? superClassName;
   final bool isAbstract;
   final List<OrmAnnotation> ormAnnotations;
-  final List<OrmMetaInfoField> fields;
+  final List<OrmMetaField> fields;
   final ModelInspector modelInspector;
 
   String? _tableName;
 
-  OrmMetaInfoClass(this.name, this.modelInspector,
+  OrmMetaClass(this.name, this.modelInspector,
       {this.superClassName,
       this.isAbstract = false,
       this.ormAnnotations = const [],
@@ -33,8 +33,8 @@ class OrmMetaInfoClass {
     return pluralize(ReCase(className).snakeCase);
   }
 
-  List<OrmMetaInfoField> allFields({bool searchParents = false}) {
-    var parentClz = modelInspector.metaInfo(superClassName!);
+  List<OrmMetaField> allFields({bool searchParents = false}) {
+    var parentClz = modelInspector.meta(superClassName!);
     return [
       ...fields,
       if (searchParents && parentClz != null)
@@ -42,13 +42,13 @@ class OrmMetaInfoClass {
     ];
   }
 
-  List<OrmMetaInfoField> idFields() {
+  List<OrmMetaField> idFields() {
     return allFields(searchParents: true)
         .where((f) => f.ormAnnotations.any((annot) => annot.runtimeType == ID))
         .toList();
   }
 
-  List<OrmMetaInfoField> serverSideFields(ActionType actionType,
+  List<OrmMetaField> serverSideFields(ActionType actionType,
       {bool searchParents = false}) {
     var fields = allFields(searchParents: false)
         .where((element) => element.ormAnnotations
@@ -56,7 +56,7 @@ class OrmMetaInfoClass {
         .toList();
 
     if (searchParents && superClassName != null) {
-      var superClz = modelInspector.metaInfo(superClassName!);
+      var superClz = modelInspector.meta(superClassName!);
       if (superClz == null) return fields;
       return [
         ...fields,
@@ -67,33 +67,33 @@ class OrmMetaInfoClass {
   }
 }
 
-class OrmMetaInfoField {
+class OrmMetaField {
   final String name;
   final String type;
   final List<OrmAnnotation> ormAnnotations;
 
-  OrmMetaInfoField(this.name, this.type, {this.ormAnnotations = const []});
+  OrmMetaField(this.name, this.type, {this.ormAnnotations = const []});
 }
 
-abstract class SqlExecutor<T extends Model> {
-  ModelInspector<T> modelInspector;
+abstract class SqlExecutor<M extends Model> {
+  ModelInspector<M> modelInspector;
 
   SqlExecutor(this.modelInspector);
 
-  bool _isEntityType(String type) {
-    // print('\t\t >>> isEntityType: $type');
+  bool _isModelType(String type) {
+    // print('\t\t >>> _isModelType: $type');
     if (type.endsWith('?')) {
       type = type.substring(0, type.length - 1);
     }
-    return modelInspector.metaInfo(type) != null;
+    return modelInspector.meta(type) != null;
   }
 
-  void insert(T entity) {
+  void insert(M model) {
     var action = ActionType.Insert;
-    var entityClassName = modelInspector.getEntityClassName(entity);
-    var clz = modelInspector.metaInfo(entityClassName)!;
+    var className = modelInspector.getClassName(model);
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    var dirtyMap = modelInspector.getDirtyFields(entity);
+    var dirtyMap = modelInspector.getDirtyFields(model);
     var ssFields = clz.serverSideFields(action, searchParents: true);
 
     var ssFieldNames = ssFields.map((e) => e.name);
@@ -115,12 +115,12 @@ abstract class SqlExecutor<T extends Model> {
     query(tableName, sql, dirtyMap);
   }
 
-  void update(T entity) {
+  void update(M model) {
     var action = ActionType.Update;
-    var entityClassName = modelInspector.getEntityClassName(entity);
-    var clz = modelInspector.metaInfo(entityClassName)!;
+    var className = modelInspector.getClassName(model);
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    var dirtyMap = modelInspector.getDirtyFields(entity);
+    var dirtyMap = modelInspector.getDirtyFields(model);
 
     var idField = clz.idFields().first; // @TODO
 
@@ -150,29 +150,29 @@ abstract class SqlExecutor<T extends Model> {
     query(tableName, sql, dirtyMap);
   }
 
-  void delete(T entity) {
-    var entityClassName = modelInspector.getEntityClassName(entity);
-    var clz = modelInspector.metaInfo(entityClassName)!;
+  void delete(M model) {
+    var className = modelInspector.getClassName(model);
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
     print(
-        'delete $tableName , fields: ${modelInspector.getDirtyFields(entity)}');
+        'delete $tableName , fields: ${modelInspector.getDirtyFields(model)}');
   }
 
-  void deletePermanent(T entity) {
-    var entityClassName = modelInspector.getEntityClassName(entity);
-    var clz = modelInspector.metaInfo(entityClassName)!;
+  void deletePermanent(M model) {
+    var className = modelInspector.getClassName(model);
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
     print(
-        'deletePermanent $tableName , fields: ${modelInspector.getDirtyFields(entity)}');
+        'deletePermanent $tableName , fields: ${modelInspector.getDirtyFields(model)}');
   }
 
   String getColumnName(String fieldName) {
     return ReCase(fieldName).snakeCase;
   }
 
-  Future<E?> findById<E extends T>(dynamic id) async {
-    var entityClassName = '$E';
-    var clz = modelInspector.metaInfo(entityClassName)!;
+  Future<N?> findById<N extends M>(dynamic id) async {
+    var className = '$N';
+    var clz = modelInspector.meta(className)!;
 
     var idFields = clz.idFields;
     var idFieldName = idFields().first.name;
@@ -180,7 +180,7 @@ abstract class SqlExecutor<T extends Model> {
 
     var selectFields = clz
         .allFields(searchParents: true)
-        .where((element) => !_isEntityType(element.type))
+        .where((element) => !_isModelType(element.type))
         .map((e) => e.name)
         .where((name) => name != idFieldName)
         .toList();
@@ -188,33 +188,33 @@ abstract class SqlExecutor<T extends Model> {
     var fieldNames = selectFields.map(getColumnName).join(',');
 
     var sql = 'select $fieldNames from $tableName where $idFieldName = $id';
-    print('findById: ${E} [$id] => $sql');
+    print('findById: ${N} [$id] => $sql');
 
     var rows = await query(tableName, sql, {});
     // print('\t result: $result');
-    E entity = modelInspector.newInstance('$E') as E;
-    modelInspector.setFieldValue(entity, idFieldName, id);
+    N model = modelInspector.newInstance('$N') as N;
+    modelInspector.setFieldValue(model, idFieldName, id);
 
     if (rows.isNotEmpty) {
       var row = rows[0];
       for (int i = 0; i < row.length; i++) {
         var name = selectFields[i];
         var value = row[i];
-        modelInspector.setFieldValue(entity, name, value);
+        modelInspector.setFieldValue(model, name, value);
       }
     }
-    return entity;
+    return model;
   }
 
-  Future<List<E>> findAll<E extends T>() async {
-    var entityClassName = '$E';
-    var clz = modelInspector.metaInfo(entityClassName)!;
+  Future<List<N>> findAll<N extends M>() async {
+    var className = '$N';
+    var clz = modelInspector.meta(className)!;
 
     var tableName = clz.tableName;
 
     var selectFields = clz
         .allFields(searchParents: true)
-        .where((element) => !_isEntityType(element.type))
+        .where((element) => !_isModelType(element.type))
         .map((e) => e.name)
         .toList();
 
@@ -227,13 +227,13 @@ abstract class SqlExecutor<T extends Model> {
     // print('\t results: $result');
 
     var result = rows.map((row) {
-      E entity = modelInspector.newInstance('$E') as E;
+      N model = modelInspector.newInstance('$N') as N;
       for (int i = 0; i < row.length; i++) {
         var name = selectFields[i];
         var value = row[i];
-        modelInspector.setFieldValue(entity, name, value);
+        modelInspector.setFieldValue(model, name, value);
       }
-      return entity;
+      return model;
     });
     return result.toList();
   }
@@ -244,34 +244,34 @@ abstract class SqlExecutor<T extends Model> {
       [List<String> returningFields = const []]);
 }
 
-abstract class ModelInspector<T> {
-  String getEntityClassName(T obj);
-  T newInstance(String entityClassName);
-  OrmMetaInfoClass? metaInfo(String entityClassName);
-  List<OrmMetaInfoClass> get allOrmMetaInfoClasses;
-  Map<String, dynamic> getDirtyFields(T obj);
-  dynamic getFieldValue(T obj, String fieldName);
-  void setFieldValue(T obj, String fieldName, dynamic value);
+abstract class ModelInspector<M> {
+  String getClassName(M model);
+  M newInstance(String className);
+  OrmMetaClass? meta(String className);
+  List<OrmMetaClass> get allOrmMetaClasses;
+  Map<String, dynamic> getDirtyFields(M model);
+  dynamic getFieldValue(M model, String fieldName);
+  void setFieldValue(M model, String fieldName, dynamic value);
 
-  void loadEntity(T entity, Map<String, dynamic> m,
+  void loadModel(M model, Map<String, dynamic> m,
       {errorOnNonExistField: false});
 }
 
-abstract class BaseModelQuery<T extends Model, D>
-    extends AbstractModelQuery<T, D> {
+abstract class BaseModelQuery<M extends Model, D>
+    extends AbstractModelQuery<M, D> {
   final SqlExecutor sqlExecutor;
 
-  String get entityClassName;
+  String get className;
 
   BaseModelQuery(this.sqlExecutor);
 
   @override
-  Future<T?> findById(D id) async {
-    return sqlExecutor.findById<T>(id);
+  Future<M?> findById(D id) async {
+    return sqlExecutor.findById<M>(id);
   }
 
   @override
-  Future<List<T>> findAll() async {
-    return sqlExecutor.findAll<T>();
+  Future<List<M>> findAll() async {
+    return sqlExecutor.findAll<M>();
   }
 }
