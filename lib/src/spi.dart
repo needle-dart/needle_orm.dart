@@ -50,7 +50,7 @@ class OrmMetaInfoClass {
 
   List<OrmMetaInfoField> serverSideFields(ActionType actionType,
       {bool searchParents = false}) {
-    var fields = allFields(searchParents: true)
+    var fields = allFields(searchParents: false)
         .where((element) => element.ormAnnotations
             .any((element) => element.isServerSide(actionType)))
         .toList();
