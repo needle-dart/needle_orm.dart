@@ -21,5 +21,5 @@ class UserDef {
   DateTimeColumn birthday = DateTimeColumn();
   BoolColumn active = BoolColumn();
 
-  List<Column> get columns => [age, name, birthday, active];
+  List<ColumnQuery> get columns => [age, name, birthday, active];
 }

@@ -1,5 +1,24 @@
-abstract class Column<T, R> {
+class ColumnQuery<T, R> {
   final List<ColumnCondition> conditions = [];
+
+  ColumnQuery();
+
+  static String classNameForType(String type) {
+    switch (type) {
+      case 'int':
+        return 'IntColumn';
+      case 'double':
+        return 'DoubleColumn';
+      case 'bool':
+        return 'BoolColumn';
+      case 'DateTime':
+        return 'DateTimeColumn';
+      case 'String':
+        return 'StringColumn';
+      default:
+        return 'ColumnQuery';
+    }
+  }
 
   R _addCondition(ColumnConditionOper oper, dynamic value) {
     conditions.add(ColumnCondition(oper, value));
@@ -9,19 +28,19 @@ abstract class Column<T, R> {
   R eq(T value) => _addCondition(ColumnConditionOper.EQ, value);
 }
 
-mixin RangeCondition<T, R> on Column<T, R> {
+mixin RangeCondition<T, R> on ColumnQuery<T, R> {
   R IN(List<T> value) => _addCondition(ColumnConditionOper.IN, value);
 
   R notIn(List<T> value) => _addCondition(ColumnConditionOper.NOT_IN, value);
 }
 
-mixin NullCondition<T, R> on Column<T, R> {
+mixin NullCondition<T, R> on ColumnQuery<T, R> {
   R isNull() => _addCondition(ColumnConditionOper.IS_NULL, null);
 
   R isNotNull() => _addCondition(ColumnConditionOper.IS_NOT_NULL, null);
 }
 
-mixin ComparableCondition<T, R> on Column<T, R> {
+mixin ComparableCondition<T, R> on ColumnQuery<T, R> {
   R gt(T value) => _addCondition(ColumnConditionOper.GT, value);
 
   R ge(T value) => _addCondition(ColumnConditionOper.GE, value);
@@ -54,14 +73,14 @@ class ColumnCondition {
   String toString() => '(${oper.name}: ${value})';
 }
 
-class NumberColumn<T, R> extends Column<T, R>
+class NumberColumn<T, R> extends ColumnQuery<T, R>
     with ComparableCondition<T, R>, RangeCondition<T, R> {}
 
 class IntColumn extends NumberColumn<int, IntColumn> {}
 
 class DoubleColumn extends NumberColumn<double, DoubleColumn> {}
 
-class StringColumn extends Column<String, StringColumn>
+class StringColumn extends ColumnQuery<String, StringColumn>
     with
         ComparableCondition<String, StringColumn>,
         RangeCondition<String, StringColumn>,
@@ -79,13 +98,13 @@ class StringColumn extends Column<String, StringColumn>
       _addCondition(ColumnConditionOper.LIKE, '%$subString%');
 }
 
-class BoolColumn extends Column<bool, BoolColumn> {
+class BoolColumn extends ColumnQuery<bool, BoolColumn> {
   BoolColumn isTrue() => _addCondition(ColumnConditionOper.EQ, true);
 
   BoolColumn isFalse() => _addCondition(ColumnConditionOper.EQ, false);
 }
 
-class DateTimeColumn extends Column<DateTime, DateTimeColumn>
+class DateTimeColumn extends ColumnQuery<DateTime, DateTimeColumn>
     with
         ComparableCondition<DateTime, DateTimeColumn>,
         NullCondition<DateTime, DateTimeColumn> {}
