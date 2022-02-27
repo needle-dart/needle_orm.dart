@@ -1,15 +1,15 @@
 import 'package:needle_orm/needle_orm.dart';
 import 'package:test/test.dart';
 
-typedef C = Condition;
+typedef C = SqlCondition;
 
 void main() {
   test('condition test', () async {
-    And c = And();
+    SqlAnd c = SqlAnd();
     c +
         C("t0.deleted = 0") +
         C("t0.name = @name", {'name': 'admin'}) +
-        Or([
+        SqlOr([
           C("t1.age > @age", {"age": 10}),
           C("t1.gendar = @gendar", {'gendar': 'F'}),
         ]);
@@ -20,20 +20,20 @@ void main() {
   });
 
   test('join test', () {
-    Join j = Join('user', 'u', JoinType.LEFT);
+    SqlJoin j = SqlJoin('user', 'u', SqlJoinType.LEFT);
     j.conditions + C("u.deleted = 0") + C("t0.id = u.id");
 
     expect(j.toSql(), 'LEFT join user u on u.deleted = 0 AND t0.id = u.id');
   });
 
   test('complete query test', () {
-    Query q = Query('user', 'u', distinct: true);
+    SqlQuery q = SqlQuery('user', 'u', distinct: true);
     q.columns.addAll(['u.id', 'u.name', 'u.email', 'u.deleted']);
     q.joins.addAll([
-      Join('user_role', 'ur', JoinType.LEFT).apply((j) {
+      SqlJoin('user_role', 'ur', SqlJoinType.LEFT).apply((j) {
         j.conditions..append(C("ur.user_id = u.id"));
       }),
-      Join('role', 'r', JoinType.LEFT).apply((j) {
+      SqlJoin('role', 'r', SqlJoinType.LEFT).apply((j) {
         j.conditions
           ..append(C("r.deleted = 0"))
           ..append(C("r.name like @role_name", {'role_name': '%member'}))
