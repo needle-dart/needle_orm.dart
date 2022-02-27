@@ -7,7 +7,9 @@ abstract class Column<T, R> {
   }
 
   R eq(T value) => _addCondition(ColumnConditionOper.EQ, value);
+}
 
+mixin RangeCondition<T, R> on Column<T, R> {
   R IN(List<T> value) => _addCondition(ColumnConditionOper.IN, value);
 
   R notIn(List<T> value) => _addCondition(ColumnConditionOper.NOT_IN, value);
@@ -52,7 +54,8 @@ class ColumnCondition {
   String toString() => '(${oper.name}: ${value})';
 }
 
-class NumberColumn<T, R> extends Column<T, R> with ComparableCondition<T, R> {}
+class NumberColumn<T, R> extends Column<T, R>
+    with ComparableCondition<T, R>, RangeCondition<T, R> {}
 
 class IntColumn extends NumberColumn<int, IntColumn> {}
 
@@ -61,6 +64,7 @@ class DoubleColumn extends NumberColumn<double, DoubleColumn> {}
 class StringColumn extends Column<String, StringColumn>
     with
         ComparableCondition<String, StringColumn>,
+        RangeCondition<String, StringColumn>,
         NullCondition<String, StringColumn> {
   StringColumn like(String pattern) =>
       _addCondition(ColumnConditionOper.LIKE, pattern);
