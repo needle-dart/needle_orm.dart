@@ -16,10 +16,10 @@ void main() {
 }
 
 class UserDef {
-  IntColumn age = IntColumn();
-  StringColumn name = StringColumn();
-  DateTimeColumn birthday = DateTimeColumn();
-  BoolColumn active = BoolColumn();
+  IntColumn age = IntColumn('age');
+  StringColumn name = StringColumn('name');
+  DateTimeColumn birthday = DateTimeColumn('birthday');
+  BoolColumn active = BoolColumn('active');
 
   List<ColumnQuery> get columns => [age, name, birthday, active];
 }

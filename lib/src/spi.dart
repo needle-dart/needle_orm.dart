@@ -261,9 +261,19 @@ abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
   final SqlExecutor sqlExecutor;
 
+  late BaseModelQuery _topQuery;
+
+  final Map<String, BaseModelQuery> queryMap = {};
+
   String get className;
 
-  BaseModelQuery(this.sqlExecutor);
+  List get columns;
+
+  BaseModelQuery(this.sqlExecutor, {BaseModelQuery? topQuery}) {
+    this._topQuery = topQuery ?? this;
+  }
+
+  BaseModelQuery get topQuery => _topQuery;
 
   @override
   Future<M?> findById(D id) async {
@@ -274,4 +284,15 @@ abstract class BaseModelQuery<M extends Model, D>
   Future<List<M>> findAll() async {
     return sqlExecutor.findAll<M>();
   }
+
+  T findQuery<T extends BaseModelQuery>(String name) {
+    var q = queryMap[name];
+    if (q == null) {
+      q = createQuery(name);
+      queryMap[name] = q;
+    }
+    return q as T;
+  }
+
+  BaseModelQuery createQuery(String name);
 }

@@ -1,7 +1,8 @@
 class ColumnQuery<T, R> {
   final List<ColumnCondition> conditions = [];
+  final String name;
 
-  ColumnQuery();
+  ColumnQuery(this.name);
 
   static String classNameForType(String type) {
     switch (type) {
@@ -21,7 +22,7 @@ class ColumnQuery<T, R> {
   }
 
   R _addCondition(ColumnConditionOper oper, dynamic value) {
-    conditions.add(ColumnCondition(oper, value));
+    conditions.add(ColumnCondition(name, oper, value));
     return this as R;
   }
 
@@ -64,27 +65,36 @@ mixin ComparableCondition<T, R> on ColumnQuery<T, R> {
 }
 
 class ColumnCondition {
+  final String name;
   final ColumnConditionOper oper;
   final dynamic value;
 
-  ColumnCondition(this.oper, this.value);
+  ColumnCondition(this.name, this.oper, this.value);
 
   @override
-  String toString() => '(${oper.name}: ${value})';
+  String toString() => '($name : ${oper.name} : ${value})';
 }
 
 class NumberColumn<T, R> extends ColumnQuery<T, R>
-    with ComparableCondition<T, R>, RangeCondition<T, R> {}
+    with ComparableCondition<T, R>, RangeCondition<T, R> {
+  NumberColumn(String name) : super(name);
+}
 
-class IntColumn extends NumberColumn<int, IntColumn> {}
+class IntColumn extends NumberColumn<int, IntColumn> {
+  IntColumn(String name) : super(name);
+}
 
-class DoubleColumn extends NumberColumn<double, DoubleColumn> {}
+class DoubleColumn extends NumberColumn<double, DoubleColumn> {
+  DoubleColumn(String name) : super(name);
+}
 
 class StringColumn extends ColumnQuery<String, StringColumn>
     with
         ComparableCondition<String, StringColumn>,
         RangeCondition<String, StringColumn>,
         NullCondition<String, StringColumn> {
+  StringColumn(String name) : super(name);
+
   StringColumn like(String pattern) =>
       _addCondition(ColumnConditionOper.LIKE, pattern);
 
@@ -99,6 +109,8 @@ class StringColumn extends ColumnQuery<String, StringColumn>
 }
 
 class BoolColumn extends ColumnQuery<bool, BoolColumn> {
+  BoolColumn(String name) : super(name);
+
   BoolColumn isTrue() => _addCondition(ColumnConditionOper.EQ, true);
 
   BoolColumn isFalse() => _addCondition(ColumnConditionOper.EQ, false);
@@ -107,7 +119,9 @@ class BoolColumn extends ColumnQuery<bool, BoolColumn> {
 class DateTimeColumn extends ColumnQuery<DateTime, DateTimeColumn>
     with
         ComparableCondition<DateTime, DateTimeColumn>,
-        NullCondition<DateTime, DateTimeColumn> {}
+        NullCondition<DateTime, DateTimeColumn> {
+  DateTimeColumn(String name) : super(name);
+}
 
 enum ColumnConditionOper {
   EQ,
