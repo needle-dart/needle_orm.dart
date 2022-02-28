@@ -206,8 +206,9 @@ abstract class SqlExecutor<M extends Model> {
     return model;
   }
 
-  Future<List<N>> findAll<N extends M>() async {
-    var className = '$N';
+  Future<List<N>> findAll<N extends M>(BaseModelQuery modelQuery) async {
+    print('BaseModelQuery class: ${modelQuery} : ${modelQuery.className}');
+    var className = modelQuery.className;
     var clz = modelInspector.meta(className)!;
 
     var tableName = clz.tableName;
@@ -227,7 +228,7 @@ abstract class SqlExecutor<M extends Model> {
     // print('\t results: $result');
 
     var result = rows.map((row) {
-      N model = modelInspector.newInstance('$N') as N;
+      N model = modelInspector.newInstance(className) as N;
       for (int i = 0; i < row.length; i++) {
         var name = selectFields[i];
         var value = row[i];
@@ -282,7 +283,7 @@ abstract class BaseModelQuery<M extends Model, D>
 
   @override
   Future<List<M>> findAll() async {
-    return sqlExecutor.findAll<M>();
+    return sqlExecutor.findAll(this);
   }
 
   T findQuery<T extends BaseModelQuery>(String name) {
