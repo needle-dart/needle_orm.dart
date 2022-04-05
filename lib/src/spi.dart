@@ -392,7 +392,7 @@ abstract class BaseModelQuery<M extends Model, D>
   T findQuery<T extends BaseModelQuery>(String modelName, String propName) {
     var q = topQuery.queryMap[modelName];
     if (q == null) {
-      q = createQuery(modelName, propName)..relatedQuery = this;
+      q = topQuery.createQuery(modelName, propName)..relatedQuery = this;
       topQuery.queryMap[modelName] = q;
     }
     return q as T;
