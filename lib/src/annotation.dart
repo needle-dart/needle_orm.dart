@@ -25,6 +25,8 @@ abstract class AbstractModelQuery<T, D> {
   Future<T?> findById(D id);
 
   Future<List<T>> findAll();
+
+  Future<List<T>> findList();
 }
 
 abstract class OrmClassAnnotation {}

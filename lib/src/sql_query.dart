@@ -9,6 +9,14 @@ class SqlQuery {
   SqlQuery(this.tableName, this.alias, {this.distinct = false});
 
   String toSql() {
+    distinct = distinct || joins.any((element) => element.distinct);
+
+    var where = [
+      conditions.toSql(wrap: false),
+      ...joins.map((e) => e.conditions.toSql(wrap: false))
+    ].where((element) => element.trim().length > 0).join(' AND ');
+
+    if (where.isNotEmpty) where = 'where ' + where;
     return [
       'select',
       distinct ? 'distinct' : '',
@@ -17,18 +25,24 @@ class SqlQuery {
       tableName,
       alias,
       joins.toSql(),
-      conditions.isNotEmpty ? 'where ' + conditions.toSql(wrap: false) : ''
+      where,
     ].where((element) => element.isNotEmpty).join(' ');
   }
+
+  Map<String, dynamic> get params => {...conditions.params, ...joins.params};
 }
 
 class SqlJoin {
   final String tableName;
   final String alias;
   final SqlJoinType joinType;
+  final String joinStmt;
+  final bool distinct; // mark 'distinct' for top SqlQuery
+
   SqlConditionGroup conditions = SqlAnd();
 
-  SqlJoin(this.tableName, this.alias, [this.joinType = SqlJoinType.INNER]);
+  SqlJoin(this.tableName, this.alias, this.joinStmt,
+      {this.distinct = false, this.joinType = SqlJoinType.INNER});
 
   String toSql() {
     return [
@@ -37,7 +51,8 @@ class SqlJoin {
       tableName,
       alias,
       'on',
-      conditions.toSql(wrap: false)
+      joinStmt
+      //conditions.toSql(wrap: false)
     ].where((element) => element.isNotEmpty).join(' ');
   }
 
@@ -111,6 +126,13 @@ class SqlConditionGroup extends SqlCondition {
   bool get isNotEmpty => conditions.isNotEmpty;
 
   SqlConditionGroup operator +(SqlCondition condition) => append(condition);
+
+  SqlConditionGroup appendAll(Iterable<SqlCondition> collection) {
+    collection.forEach((element) {
+      append(element);
+    });
+    return this;
+  }
 
   SqlConditionGroup append(SqlCondition condition) {
     conditions.add(condition);

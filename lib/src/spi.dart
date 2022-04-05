@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:inflection3/inflection3.dart';
+import 'package:needle_orm/src/common.dart';
 import 'package:recase/recase.dart';
 
 import 'annotation.dart';
+import 'query.dart';
+import 'sql_query.dart';
 
 class OrmMetaClass {
   final String name;
@@ -239,6 +242,39 @@ abstract class SqlExecutor<M extends Model> {
     return result.toList();
   }
 
+  Future<List<N>> findList<N extends M>(BaseModelQuery modelQuery) async {
+    print('BaseModelQuery class: ${modelQuery} : ${modelQuery.className}');
+    var className = modelQuery.className;
+    var clz = modelInspector.meta(className)!;
+
+    var tableName = clz.tableName;
+
+    var selectFields = clz
+        .allFields(searchParents: true)
+        .where((element) => !_isModelType(element.type))
+        .map((e) => e.name)
+        .toList();
+
+    var fieldNames = selectFields.map(getColumnName).join(',');
+
+    var sql = 'select $fieldNames from $tableName';
+    // print('findAll: ${E} => $sql');
+
+    var rows = await query(tableName, sql, {});
+    // print('\t results: $result');
+
+    var result = rows.map((row) {
+      N model = modelInspector.newInstance(className) as N;
+      for (int i = 0; i < row.length; i++) {
+        var name = selectFields[i];
+        var value = row[i];
+        modelInspector.setFieldValue(model, name, value);
+      }
+      return model;
+    });
+    return result.toList();
+  }
+
   /// Executes a single query.
   Future<List<List>> query(
       String tableName, String sql, Map<String, dynamic> substitutionValues,
@@ -268,10 +304,34 @@ abstract class BaseModelQuery<M extends Model, D>
 
   String get className;
 
-  List get columns;
+  String _alias = '';
 
-  BaseModelQuery(this.sqlExecutor, {BaseModelQuery? topQuery}) {
+  String get alias => _alias;
+
+  List<ColumnQuery> get columns;
+
+  List<BaseModelQuery> get joins;
+
+  // for join
+  BaseModelQuery? relatedQuery;
+  String? propName;
+
+  BaseModelQuery(this.sqlExecutor, {BaseModelQuery? topQuery, this.propName}) {
     this._topQuery = topQuery ?? this;
+  }
+
+  bool _hasCondition([List<BaseModelQuery>? refrenceCache = null]) {
+    // prevent cycle reference
+    if (refrenceCache == null) {
+      refrenceCache = [this];
+    } else {
+      if (refrenceCache.contains(this)) {
+        return false;
+      }
+    }
+
+    return columns.any((c) => c.hasCondition) ||
+        joins.any((j) => j._hasCondition(refrenceCache));
   }
 
   BaseModelQuery get topQuery => _topQuery;
@@ -286,14 +346,83 @@ abstract class BaseModelQuery<M extends Model, D>
     return sqlExecutor.findAll(this);
   }
 
-  T findQuery<T extends BaseModelQuery>(String name) {
-    var q = queryMap[name];
+  SqlJoin _toSqlJoin() {
+    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+
+    var joinStmt = '${relatedQuery!._alias}.${propName}_id = ${_alias}.id';
+
+    return SqlJoin(tableName, _alias, joinStmt).apply((join) {
+      columns.where((column) => column.hasCondition).forEach((column) {
+        join.conditions.appendAll(column.toSqlConditions(_alias));
+      });
+    });
+  }
+
+  @override
+  Future<List<M>> findList() async {
+    // init all table aliases.
+    _beforeQuery();
+
+    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+
+    SqlQuery q = SqlQuery(tableName, _alias);
+    q.columns.addAll(clz.fields.map((f) => "$_alias.${f.name}"));
+
+    // _allJoins().map((e) => )
+    q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
+
+    var conditions = columns.fold<List<SqlCondition>>(
+        [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
+
+    q.conditions.appendAll(conditions);
+
+    var sql = q.toSql();
+    var params = q.params;
+
+    var rows = await sqlExecutor.query(tableName, sql, params);
+
+    // print('\t sql: $sql');
+
+    // return sqlExecutor.findList(this);
+    return [];
+  }
+
+  T findQuery<T extends BaseModelQuery>(String modelName, String propName) {
+    var q = topQuery.queryMap[modelName];
     if (q == null) {
-      q = createQuery(name);
-      queryMap[name] = q;
+      q = createQuery(modelName, propName)..relatedQuery = this;
+      topQuery.queryMap[modelName] = q;
     }
     return q as T;
   }
 
-  BaseModelQuery createQuery(String name);
+  BaseModelQuery createQuery(String modelName, String propName);
+
+  void _beforeQuery() {
+    if (this._topQuery != this) return;
+    var allJoins = _allJoins();
+    int i = 0;
+    this._alias = "t${i++}";
+    allJoins.forEach((element) {
+      element._alias = "t${i++}";
+    });
+  }
+
+  List<BaseModelQuery> _allJoins() {
+    return _subJoins([]);
+  }
+
+  List<BaseModelQuery> _subJoins(List<BaseModelQuery> refrenceCache) {
+    joins
+        // filter those with conditions
+        .where((j) => j._hasCondition())
+        // prevent cycle reference
+        .where((j) => !refrenceCache.contains(j))
+        .forEach((j) {
+      refrenceCache.add(j);
+    });
+    return refrenceCache;
+  }
 }

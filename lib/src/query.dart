@@ -1,8 +1,16 @@
+import 'sql_query.dart';
+
 class ColumnQuery<T, R> {
   final List<ColumnCondition> conditions = [];
   final String name;
 
   ColumnQuery(this.name);
+
+  bool get hasCondition => !this.conditions.isEmpty;
+
+  void clear() {
+    conditions.clear();
+  }
 
   static String classNameForType(String type) {
     switch (type) {
@@ -27,6 +35,57 @@ class ColumnQuery<T, R> {
   }
 
   R eq(T value) => _addCondition(ColumnConditionOper.EQ, value);
+
+  Iterable<SqlCondition> toSqlConditions(String tableAlias) {
+    return conditions.map((e) => _toSqlCondition(tableAlias, e));
+  }
+
+  SqlCondition _toSqlCondition(String tableAlias, ColumnCondition cc) {
+    SqlCondition sc = SqlCondition("r.deleted = 0");
+    String columnName = '$tableAlias.$name';
+    String paramName = '${tableAlias}__$name';
+    bool isRemote = false;
+    String? ssExpr = null;
+    if (cc.value is ServerSideExpr) {
+      isRemote = true;
+      ssExpr = (cc.value as ServerSideExpr).expr;
+    }
+    String op = toSql(cc.oper);
+    switch (cc.oper) {
+      case ColumnConditionOper.EQ:
+      case ColumnConditionOper.GT:
+      case ColumnConditionOper.LT:
+      case ColumnConditionOper.GE:
+      case ColumnConditionOper.LE:
+      case ColumnConditionOper.LIKE:
+        sc = isRemote
+            ? SqlCondition("$columnName $op ${ssExpr!} ")
+            : SqlCondition(
+                "$columnName $op @$paramName ", {paramName: cc.value});
+        break;
+      case ColumnConditionOper.BETWEEN:
+      case ColumnConditionOper.NOT_BETWEEN:
+        sc = SqlCondition(
+            "$columnName $op @${paramName}_from and @${paramName}_to",
+            {paramName + '_from': cc.value[0], paramName + '_to': cc.value[1]});
+        break;
+      case ColumnConditionOper.IN:
+      case ColumnConditionOper.NOT_IN:
+        sc =
+            SqlCondition("$columnName $op @$paramName ", {paramName: cc.value});
+        break;
+      case ColumnConditionOper.IS_NULL:
+      case ColumnConditionOper.IS_NOT_NULL:
+        sc = SqlCondition("$columnName $op ");
+        break;
+    }
+    return sc;
+  }
+}
+
+class ServerSideExpr {
+  final String expr;
+  ServerSideExpr(this.expr) {}
 }
 
 mixin RangeCondition<T, R> on ColumnQuery<T, R> {
@@ -136,4 +195,23 @@ enum ColumnConditionOper {
   NOT_IN,
   IS_NULL,
   IS_NOT_NULL
+}
+
+const List<String> _sql = [
+  '=',
+  '>',
+  '<',
+  '>=',
+  '<=',
+  'between',
+  'not between',
+  'like',
+  'in',
+  'not in',
+  'is null',
+  'is not null'
+];
+
+String toSql(ColumnConditionOper oper) {
+  return _sql[oper.index];
 }
