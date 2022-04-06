@@ -1,4 +1,7 @@
+import 'annotation.dart';
+import 'sql_executor.dart';
 import 'sql_query.dart';
+import 'common.dart';
 
 class ColumnQuery<T, R> {
   final List<ColumnCondition> conditions = [];
@@ -214,4 +217,137 @@ const List<String> _sql = [
 
 String toSql(ColumnConditionOper oper) {
   return _sql[oper.index];
+}
+
+abstract class BaseModelQuery<M extends Model, D>
+    extends AbstractModelQuery<M, D> {
+  final SqlExecutor sqlExecutor;
+
+  late BaseModelQuery _topQuery;
+
+  final Map<String, BaseModelQuery> queryMap = {};
+
+  String get className;
+
+  String _alias = '';
+
+  String get alias => _alias;
+
+  List<ColumnQuery> get columns;
+
+  List<BaseModelQuery> get joins;
+
+  // for join
+  BaseModelQuery? relatedQuery;
+  String? propName;
+
+  BaseModelQuery(this.sqlExecutor, {BaseModelQuery? topQuery, this.propName}) {
+    this._topQuery = topQuery ?? this;
+  }
+
+  bool _hasCondition([List<BaseModelQuery>? refrenceCache = null]) {
+    // prevent cycle reference
+    if (refrenceCache == null) {
+      refrenceCache = [this];
+    } else {
+      if (refrenceCache.contains(this)) {
+        return false;
+      }
+    }
+
+    return columns.any((c) => c.hasCondition) ||
+        joins.any((j) => j._hasCondition(refrenceCache));
+  }
+
+  BaseModelQuery get topQuery => _topQuery;
+
+  @override
+  Future<M?> findById(D id) async {
+    return sqlExecutor.findById<M>(id);
+  }
+
+  @override
+  Future<List<M>> findAll() async {
+    return sqlExecutor.findAll(this);
+  }
+
+  SqlJoin _toSqlJoin() {
+    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+
+    var joinStmt = '${relatedQuery!._alias}.${propName}_id = ${_alias}.id';
+
+    return SqlJoin(tableName, _alias, joinStmt).apply((join) {
+      columns.where((column) => column.hasCondition).forEach((column) {
+        join.conditions.appendAll(column.toSqlConditions(_alias));
+      });
+    });
+  }
+
+  @override
+  Future<List<M>> findList() async {
+    // init all table aliases.
+    _beforeQuery();
+
+    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+
+    SqlQuery q = SqlQuery(tableName, _alias);
+    q.columns.addAll(clz.fields.map((f) => "$_alias.${f.name}"));
+
+    // _allJoins().map((e) => )
+    q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
+
+    var conditions = columns.fold<List<SqlCondition>>(
+        [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
+
+    q.conditions.appendAll(conditions);
+
+    var sql = q.toSql();
+    var params = q.params;
+
+    var rows = await sqlExecutor.query(tableName, sql, params);
+
+    // print('\t sql: $sql');
+
+    // return sqlExecutor.findList(this);
+    return [];
+  }
+
+  T findQuery<T extends BaseModelQuery>(String modelName, String propName) {
+    var q = topQuery.queryMap[modelName];
+    if (q == null) {
+      q = topQuery.createQuery(modelName, propName)..relatedQuery = this;
+      topQuery.queryMap[modelName] = q;
+    }
+    return q as T;
+  }
+
+  BaseModelQuery createQuery(String modelName, String propName);
+
+  void _beforeQuery() {
+    if (this._topQuery != this) return;
+    var allJoins = _allJoins();
+    int i = 0;
+    this._alias = "t${i++}";
+    allJoins.forEach((element) {
+      element._alias = "t${i++}";
+    });
+  }
+
+  List<BaseModelQuery> _allJoins() {
+    return _subJoins([]);
+  }
+
+  List<BaseModelQuery> _subJoins(List<BaseModelQuery> refrenceCache) {
+    joins
+        // filter those with conditions
+        .where((j) => j._hasCondition())
+        // prevent cycle reference
+        .where((j) => !refrenceCache.contains(j))
+        .forEach((j) {
+      refrenceCache.add(j);
+    });
+    return refrenceCache;
+  }
 }

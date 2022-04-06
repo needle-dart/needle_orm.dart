@@ -1,4 +1,4 @@
-import 'package:needle_orm/src/query.dart';
+import 'package:needle_orm/needle_orm.dart';
 import 'package:test/test.dart';
 
 void main() {
