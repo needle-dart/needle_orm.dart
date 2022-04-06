@@ -1,5 +1,3 @@
-import 'package:recase/recase.dart';
-
 import 'annotation.dart';
 import 'inspector.dart';
 import 'query.dart';
@@ -8,14 +6,6 @@ abstract class SqlExecutor<M extends Model> {
   ModelInspector<M> modelInspector;
 
   SqlExecutor(this.modelInspector);
-
-  bool _isModelType(String type) {
-    // print('\t\t >>> _isModelType: $type');
-    if (type.endsWith('?')) {
-      type = type.substring(0, type.length - 1);
-    }
-    return modelInspector.meta(type) != null;
-  }
 
   void insert(M model) {
     var action = ActionType.Insert;
@@ -26,8 +16,9 @@ abstract class SqlExecutor<M extends Model> {
     var ssFields = clz.serverSideFields(action, searchParents: true);
 
     var ssFieldNames = ssFields.map((e) => e.name);
-    var fieldNames =
-        [...dirtyMap.keys, ...ssFieldNames].map(getColumnName).join(',');
+    var columnNames = [...dirtyMap.keys, ...ssFieldNames]
+        .map((fn) => clz.findField(fn)!.columnName)
+        .join(',');
 
     var ssFieldValues = ssFields
         .map((e) => e.ormAnnotations
@@ -39,7 +30,8 @@ abstract class SqlExecutor<M extends Model> {
       ...dirtyMap.keys.map((e) => '@$e'),
       ...ssFieldValues,
     ].join(',');
-    var sql = 'insert into $tableName( $fieldNames ) values( $fieldVariables )';
+    var sql =
+        'insert into $tableName( $columnNames ) values( $fieldVariables )';
     print('Insert SQL: $sql');
     query(tableName, sql, dirtyMap);
   }
@@ -60,7 +52,7 @@ abstract class SqlExecutor<M extends Model> {
     var setClause = <String>[];
 
     dirtyMap.keys.forEach((name) {
-      setClause.add('${getColumnName(name)}=@$name');
+      setClause.add('${clz.findField(name)!.columnName}=@$name');
     });
 
     ssFields.forEach((field) {
@@ -69,7 +61,7 @@ abstract class SqlExecutor<M extends Model> {
           .firstWhere((element) => element.isServerSide(action))
           .serverSideExpr(action);
 
-      setClause.add("${getColumnName(name)}=$value");
+      setClause.add("${field.columnName}=$value");
     });
 
     dirtyMap[idField.name] = idValue;
@@ -95,10 +87,6 @@ abstract class SqlExecutor<M extends Model> {
         'deletePermanent $tableName , fields: ${modelInspector.getDirtyFields(model)}');
   }
 
-  String getColumnName(String fieldName) {
-    return ReCase(fieldName).snakeCase;
-  }
-
   Future<N?> findById<N extends M>(dynamic id) async {
     var className = '$N';
     var clz = modelInspector.meta(className)!;
@@ -109,14 +97,13 @@ abstract class SqlExecutor<M extends Model> {
 
     var selectFields = clz
         .allFields(searchParents: true)
-        .where((element) => !_isModelType(element.type))
-        .map((e) => e.name)
+        .where((element) => !element.isModelType)
         .where((name) => name != idFieldName)
         .toList();
 
-    var fieldNames = selectFields.map(getColumnName).join(',');
+    var columnNames = selectFields.map((f) => f.columnName).join(',');
 
-    var sql = 'select $fieldNames from $tableName where $idFieldName = $id';
+    var sql = 'select $columnNames from $tableName where $idFieldName = $id';
     print('findById: ${N} [$id] => $sql');
 
     var rows = await query(tableName, sql, {});
@@ -127,7 +114,7 @@ abstract class SqlExecutor<M extends Model> {
     if (rows.isNotEmpty) {
       var row = rows[0];
       for (int i = 0; i < row.length; i++) {
-        var name = selectFields[i];
+        var name = selectFields[i].name;
         var value = row[i];
         modelInspector.setFieldValue(model, name, value);
       }
@@ -144,13 +131,12 @@ abstract class SqlExecutor<M extends Model> {
 
     var selectFields = clz
         .allFields(searchParents: true)
-        .where((element) => !_isModelType(element.type))
-        .map((e) => e.name)
+        .where((element) => !element.isModelType)
         .toList();
 
-    var fieldNames = selectFields.map(getColumnName).join(',');
+    var columnNames = selectFields.map((f) => f.columnName).join(',');
 
-    var sql = 'select $fieldNames from $tableName';
+    var sql = 'select $columnNames from $tableName';
     // print('findAll: ${E} => $sql');
 
     var rows = await query(tableName, sql, {});
@@ -159,40 +145,7 @@ abstract class SqlExecutor<M extends Model> {
     var result = rows.map((row) {
       N model = modelInspector.newInstance(className) as N;
       for (int i = 0; i < row.length; i++) {
-        var name = selectFields[i];
-        var value = row[i];
-        modelInspector.setFieldValue(model, name, value);
-      }
-      return model;
-    });
-    return result.toList();
-  }
-
-  Future<List<N>> findList<N extends M>(BaseModelQuery modelQuery) async {
-    print('BaseModelQuery class: ${modelQuery} : ${modelQuery.className}');
-    var className = modelQuery.className;
-    var clz = modelInspector.meta(className)!;
-
-    var tableName = clz.tableName;
-
-    var selectFields = clz
-        .allFields(searchParents: true)
-        .where((element) => !_isModelType(element.type))
-        .map((e) => e.name)
-        .toList();
-
-    var fieldNames = selectFields.map(getColumnName).join(',');
-
-    var sql = 'select $fieldNames from $tableName';
-    // print('findAll: ${E} => $sql');
-
-    var rows = await query(tableName, sql, {});
-    // print('\t results: $result');
-
-    var result = rows.map((row) {
-      N model = modelInspector.newInstance(className) as N;
-      for (int i = 0; i < row.length; i++) {
-        var name = selectFields[i];
+        var name = selectFields[i].name;
         var value = row[i];
         modelInspector.setFieldValue(model, name, value);
       }

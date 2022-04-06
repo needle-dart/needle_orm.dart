@@ -20,6 +20,9 @@ class OrmMetaClass {
       this.isAbstract = false,
       this.ormAnnotations = const [],
       this.fields = const []}) {
+    fields.forEach((f) {
+      f.clz = this;
+    });
     var tables = ormAnnotations.whereType<Table>();
     if (tables.isNotEmpty) {
       _tableName = tables.first.name;
@@ -40,6 +43,17 @@ class OrmMetaClass {
       if (searchParents && parentClz != null)
         ...parentClz.allFields(searchParents: searchParents)
     ];
+  }
+
+  OrmMetaField? findField(String name) {
+    if (fields.any((element) => element.name == name)) {
+      return fields.where((element) => element.name == name).first;
+    }
+    if (superClassName != null) {
+      var parentClz = modelInspector.meta(superClassName!);
+      return parentClz?.findField(name);
+    }
+    return null;
   }
 
   List<OrmMetaField> idFields() {
@@ -72,5 +86,14 @@ class OrmMetaField {
   final String type;
   final List<OrmAnnotation> ormAnnotations;
 
+  late OrmMetaClass clz;
   OrmMetaField(this.name, this.type, {this.ormAnnotations = const []});
+
+  bool get isModelType => clz.modelInspector.isModelType(type);
+
+  String get columnName {
+    var s = ReCase(name).snakeCase;
+    if (isModelType) s += '_id';
+    return s;
+  }
 }

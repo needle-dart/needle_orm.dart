@@ -293,7 +293,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var tableName = clz.tableName;
 
     SqlQuery q = SqlQuery(tableName, _alias);
-    q.columns.addAll(clz.fields.map((f) => "$_alias.${f.name}"));
+    q.columns.addAll(clz.fields.map((f) => "$_alias.${f.columnName}"));
 
     // _allJoins().map((e) => )
     q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
