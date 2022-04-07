@@ -1,4 +1,5 @@
 import 'annotation.dart';
+import 'inspector.dart';
 import 'sql_executor.dart';
 import 'sql_query.dart';
 import 'common.dart';
@@ -222,6 +223,7 @@ String toSql(ColumnConditionOper oper) {
 abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
   final SqlExecutor sqlExecutor;
+  final ModelInspector modelInspector;
 
   late BaseModelQuery _topQuery;
 
@@ -241,7 +243,8 @@ abstract class BaseModelQuery<M extends Model, D>
   BaseModelQuery? relatedQuery;
   String? propName;
 
-  BaseModelQuery(this.sqlExecutor, {BaseModelQuery? topQuery, this.propName}) {
+  BaseModelQuery(this.modelInspector, this.sqlExecutor,
+      {BaseModelQuery? topQuery, this.propName}) {
     this._topQuery = topQuery ?? this;
   }
 
@@ -292,8 +295,10 @@ abstract class BaseModelQuery<M extends Model, D>
     var clz = sqlExecutor.modelInspector.meta(className)!;
     var tableName = clz.tableName;
 
+    var allFields = clz.allFields(searchParents: true);
+
     SqlQuery q = SqlQuery(tableName, _alias);
-    q.columns.addAll(clz.fields.map((f) => "$_alias.${f.columnName}"));
+    q.columns.addAll(allFields.map((f) => "$_alias.${f.columnName}"));
 
     // _allJoins().map((e) => )
     q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
@@ -310,8 +315,12 @@ abstract class BaseModelQuery<M extends Model, D>
 
     // print('\t sql: $sql');
 
+    var result = rows.map((row) {
+      return sqlExecutor.toModel<M>(row, allFields, className);
+    });
+
     // return sqlExecutor.findList(this);
-    return [];
+    return result.toList();
   }
 
   T findQuery<T extends BaseModelQuery>(String modelName, String propName) {

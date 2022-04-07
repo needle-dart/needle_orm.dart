@@ -89,7 +89,21 @@ class OrmMetaField {
   late OrmMetaClass clz;
   OrmMetaField(this.name, this.type, {this.ormAnnotations = const []});
 
-  bool get isModelType => clz.modelInspector.isModelType(type);
+  bool get isModelType => clz.modelInspector.isModelType(elementType);
+
+  String get elementType {
+    var t = type;
+    if (t.startsWith('List<')) {
+      t = t.substring(5, t.length - 1);
+    }
+    if (t.startsWith('Set<')) {
+      t = t.substring(4, t.length - 1);
+    }
+    if (t.endsWith('?')) {
+      t = t.substring(0, t.length - 1);
+    }
+    return t;
+  }
 
   String get columnName {
     var s = ReCase(name).snakeCase;

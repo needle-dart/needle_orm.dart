@@ -1,5 +1,6 @@
 import 'annotation.dart';
 import 'inspector.dart';
+import 'meta.dart';
 import 'query.dart';
 
 abstract class SqlExecutor<M extends Model> {
@@ -95,31 +96,21 @@ abstract class SqlExecutor<M extends Model> {
     var idFieldName = idFields().first.name;
     var tableName = clz.tableName;
 
-    var selectFields = clz
-        .allFields(searchParents: true)
-        .where((element) => !element.isModelType)
-        .where((name) => name != idFieldName)
-        .toList();
+    var allFields = clz.allFields(searchParents: true);
 
-    var columnNames = selectFields.map((f) => f.columnName).join(',');
+    var columnNames = allFields.map((f) => f.columnName).join(',');
 
     var sql = 'select $columnNames from $tableName where $idFieldName = $id';
     print('findById: ${N} [$id] => $sql');
 
     var rows = await query(tableName, sql, {});
+
     // print('\t result: $result');
-    N model = modelInspector.newInstance('$N') as N;
-    modelInspector.setFieldValue(model, idFieldName, id);
 
     if (rows.isNotEmpty) {
-      var row = rows[0];
-      for (int i = 0; i < row.length; i++) {
-        var name = selectFields[i].name;
-        var value = row[i];
-        modelInspector.setFieldValue(model, name, value);
-      }
+      return toModel(rows[0], allFields, className);
     }
-    return model;
+    return null;
   }
 
   Future<List<N>> findAll<N extends M>(BaseModelQuery modelQuery) async {
@@ -131,7 +122,7 @@ abstract class SqlExecutor<M extends Model> {
 
     var selectFields = clz
         .allFields(searchParents: true)
-        .where((element) => !element.isModelType)
+        // .where((element) => !element.isModelType)
         .toList();
 
     var columnNames = selectFields.map((f) => f.columnName).join(',');
@@ -143,15 +134,29 @@ abstract class SqlExecutor<M extends Model> {
     // print('\t results: $result');
 
     var result = rows.map((row) {
-      N model = modelInspector.newInstance(className) as N;
-      for (int i = 0; i < row.length; i++) {
-        var name = selectFields[i].name;
-        var value = row[i];
-        modelInspector.setFieldValue(model, name, value);
-      }
-      return model;
+      return toModel<N>(row, selectFields, className);
     });
     return result.toList();
+  }
+
+  N toModel<N extends M>(List<dynamic> dbRow, List<OrmMetaField> selectedFields,
+      String className) {
+    N model = modelInspector.newInstance(className) as N;
+    for (int i = 0; i < dbRow.length; i++) {
+      var f = selectedFields[i];
+      var name = f.name;
+      var value = dbRow[i];
+      if (f.isModelType) {
+        if (value != null) {
+          var obj = modelInspector.newInstance(f.elementType);
+          modelInspector.setFieldValue(obj, 'id', value);
+          modelInspector.setFieldValue(model, name, obj);
+        }
+      } else {
+        modelInspector.setFieldValue(model, name, value);
+      }
+    }
+    return model;
   }
 
   /// Executes a single query.
