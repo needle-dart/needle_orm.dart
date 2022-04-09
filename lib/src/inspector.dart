@@ -1,9 +1,12 @@
 import 'meta.dart';
+import 'query.dart';
 
 abstract class ModelInspector<M> {
   String getClassName(M model);
 
   M newInstance(String className);
+
+  BaseModelQuery newQuery(String modelName);
 
   OrmMetaClass? meta(String className);
 
