@@ -1,6 +1,8 @@
 // see javax.persistence.*
 
-abstract class Model {}
+abstract class Model {
+  String get className;
+}
 
 abstract class OrmAnnotation {
   final AnnotationTarget _target;

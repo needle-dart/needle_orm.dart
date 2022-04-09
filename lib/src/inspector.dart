@@ -6,7 +6,7 @@ abstract class ModelInspector<M> {
 
   M newInstance(String className);
 
-  BaseModelQuery newQuery(String modelName);
+  BaseModelQuery newQuery(String className);
 
   OrmMetaClass? meta(String className);
 
