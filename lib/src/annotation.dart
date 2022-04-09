@@ -2,6 +2,7 @@
 
 abstract class Model {
   String get className;
+  Map<String, dynamic> toMap({bool ignoreNull = true});
 }
 
 abstract class OrmAnnotation {
