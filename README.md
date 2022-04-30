@@ -110,11 +110,14 @@ void main() {
     ..name = 'administrator'
     ..address = 'abc'
     ..age = 23
-    ..save(); // insert
+    ..save(); // = insert
+    //.insert();
 
   user
     ..id = 100
-    ..save(); // update because id is set.
+    ..name = 'another'
+    ..save(); // = update, because id is set.
+    //..update();
 
   // call business method
   print('is admin? ${user.isAdmin()}');
@@ -131,13 +134,13 @@ void main() {
 
   Book.Query
     ..title.startsWith('dart')
-    ..price.between(10.0, 20)
+    ..price.between(10.0, 20.0)
     ..author.apply((author) {
       author
         ..age.ge(18)
         ..address.startsWith('China Shanghai');
     })
-    ..findAll();
+    ..findList();
 }
 
 ```
