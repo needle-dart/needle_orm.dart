@@ -1,4 +1,4 @@
-import 'package:loggy/loggy.dart';
+import 'package:logging/logging.dart';
 
 import 'annotation.dart';
 import 'inspector.dart';
@@ -225,7 +225,7 @@ String toSql(ColumnConditionOper oper) {
 
 abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
-  static Loggy _logger = Loggy('ORM');
+  static Logger _logger = Logger('ORM');
   final SqlExecutor sqlExecutor;
   final ModelInspector modelInspector;
 
@@ -281,7 +281,7 @@ abstract class BaseModelQuery<M extends Model, D>
     });
   }
 
-  void insert(M model) {
+  Future<int> insert(M model) async {
     var action = ActionType.Insert;
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
@@ -298,7 +298,7 @@ abstract class BaseModelQuery<M extends Model, D>
         .map((e) => e.ormAnnotations
             .firstWhere((element) => element.isServerSide(action))
             .serverSideExpr(action))
-        .map((e) => "'$e'");
+        .map((e) => "$e");
 
     var fieldVariables = [
       ...dirtyMap.keys.map((e) => '@$e'),
@@ -306,11 +306,27 @@ abstract class BaseModelQuery<M extends Model, D>
     ].join(',');
     var sql =
         'insert into $tableName( $columnNames ) values( $fieldVariables )';
-    _logger.info('Insert SQL: $sql');
-    sqlExecutor.query(tableName, sql, dirtyMap);
+    _logger.fine('Insert SQL: $sql');
+
+    dirtyMap.forEach((key, value) {
+      if (value is Model) {
+        var _clz = modelInspector.meta(modelInspector.getClassName(value));
+        dirtyMap[key] =
+            modelInspector.getFieldValue(value, _clz!.idFields().first.name);
+      }
+    });
+    var id = await sqlExecutor.query(tableName, sql, dirtyMap, []);
+    _logger.fine(' >>> query returned: ${id}');
+    if (id.isNotEmpty) {
+      if (id[0].isNotEmpty) {
+        modelInspector.setFieldValue(model, "id", id[0][0]);
+        return id[0][0];
+      }
+    }
+    return 0;
   }
 
-  void update(M model) {
+  Future<void> update(M model) async {
     var action = ActionType.Update;
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
@@ -341,23 +357,32 @@ abstract class BaseModelQuery<M extends Model, D>
     dirtyMap[idField.name] = idValue;
     var sql =
         'update $tableName set ${setClause.join(',')} where ${idField.name}=@${idField.name}';
-    _logger.info('Update SQL: $sql');
-    sqlExecutor.query(tableName, sql, dirtyMap);
+    _logger.fine('Update SQL: $sql');
+
+    dirtyMap.forEach((key, value) {
+      if (value is Model) {
+        var _clz = modelInspector.meta(modelInspector.getClassName(value));
+        dirtyMap[key] =
+            modelInspector.getFieldValue(value, _clz!.idFields().first.name);
+      }
+    });
+
+    await sqlExecutor.query(tableName, sql, dirtyMap);
   }
 
-  void delete(M model) {
+  Future<void> delete(M model) async {
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    _logger.info(
+    _logger.fine(
         'delete $tableName , fields: ${modelInspector.getDirtyFields(model)}');
   }
 
-  void deletePermanent(M model) {
+  Future<void> deletePermanent(M model) async {
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    _logger.info(
+    _logger.fine(
         'deletePermanent $tableName , fields: ${modelInspector.getDirtyFields(model)}');
   }
 
@@ -373,11 +398,11 @@ abstract class BaseModelQuery<M extends Model, D>
     var columnNames = allFields.map((f) => f.columnName).join(',');
 
     var sql = 'select $columnNames from $tableName where $idFieldName = $id';
-    _logger.info('findById: ${className} [$id] => $sql');
+    _logger.fine('findById: ${className} [$id] => $sql');
 
     var rows = await sqlExecutor.query(tableName, sql, {});
 
-    // _logger.info('\t result: $result');
+    // _logger.fine('\t result: $result');
 
     if (rows.isNotEmpty) {
       return toModel(rows[0], allFields, className);
@@ -431,7 +456,8 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var rows = await sqlExecutor.query(tableName, sql, params);
 
-    // _logger.info('\t sql: $sql');
+    _logger.fine('\t sql: $sql');
+    _logger.fine('\t rows: ${rows.length}');
 
     var result = rows.map((row) {
       return toModel<M>(row, allFields, className);

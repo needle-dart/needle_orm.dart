@@ -27,4 +27,8 @@ abstract class ModelInspector<M> {
     }
     return meta(type) != null;
   }
+
+  List<OrmMetaField>? idFields(String className) {
+    return meta(className)?.idFields();
+  }
 }
