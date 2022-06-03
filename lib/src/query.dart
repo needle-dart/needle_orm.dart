@@ -165,10 +165,10 @@ class StringColumn extends ColumnQuery<String, StringColumn>
       _addCondition(ColumnConditionOper.LIKE, pattern);
 
   StringColumn startsWith(String prefix) =>
-      _addCondition(ColumnConditionOper.LIKE, '%$prefix');
+      _addCondition(ColumnConditionOper.LIKE, '$prefix%');
 
   StringColumn endsWith(String prefix) =>
-      _addCondition(ColumnConditionOper.LIKE, '$prefix%');
+      _addCondition(ColumnConditionOper.LIKE, '%$prefix');
 
   StringColumn contains(String subString) =>
       _addCondition(ColumnConditionOper.LIKE, '%$subString%');
