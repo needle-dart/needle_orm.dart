@@ -4,7 +4,8 @@ import 'query.dart';
 abstract class ModelInspector<M> {
   String getClassName(M model);
 
-  M newInstance(String className);
+  M newInstance(String className,
+      {bool attachDb = false, required BaseModelQuery topQuery});
 
   BaseModelQuery newQuery(String className);
 
@@ -31,4 +32,6 @@ abstract class ModelInspector<M> {
   List<OrmMetaField>? idFields(String className) {
     return meta(className)?.idFields();
   }
+
+  void markLoaded(M model);
 }

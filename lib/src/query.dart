@@ -386,7 +386,7 @@ abstract class BaseModelQuery<M extends Model, D>
         'deletePermanent $tableName , fields: ${modelInspector.getDirtyFields(model)}');
   }
 
-  Future<M?> findById(D id) async {
+  Future<M?> findById(D id, {M? existModel}) async {
     var clz = modelInspector.meta(className)!;
 
     var idFields = clz.idFields;
@@ -402,24 +402,68 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var rows = await sqlExecutor.query(tableName, sql, {});
 
-    // _logger.fine('\t result: $result');
-
     if (rows.isNotEmpty) {
-      return toModel(rows[0], allFields, className);
+      return toModel(rows[0], allFields, className, existModel: existModel);
     }
     return null;
   }
 
-  N toModel<N extends M>(List<dynamic> dbRow, List<OrmMetaField> selectedFields,
-      String className) {
-    N model = modelInspector.newInstance(className) as N;
+  Future<List<M>> findByIds(List idList, {List<Model>? existModeList}) async {
+    var clz = modelInspector.meta(className)!;
+
+    var idFields = clz.idFields;
+    var idFieldName = idFields().first.name;
+    var tableName = clz.tableName;
+
+    var allFields = clz.allFields(searchParents: true);
+
+    var columnNames = allFields.map((f) => f.columnName).join(',');
+
+    var sql =
+        'select $columnNames from $tableName where $idFieldName in @idList';
+    _logger.fine('findByIds: ${className} $idList => $sql');
+
+    var rows = await sqlExecutor.query(tableName, sql, {'idList': idList});
+
+    if (rows.isNotEmpty) {
+      var idIndex = 0;
+      for (int i = 0; i < allFields.length; i++) {
+        if (allFields[i].name == idFieldName) {
+          idIndex = i;
+          break;
+        }
+      }
+      var result = <M>[];
+      for (int i = 0; i < rows.length; i++) {
+        var id = rows[i][idIndex];
+        M? m = null;
+        var list = existModeList?.where((element) =>
+            modelInspector.getFieldValue(element, idFieldName) == id);
+        if (list?.isNotEmpty ?? false) {
+          m = list?.first as M;
+        }
+        result.add(toModel(rows[i], allFields, className, existModel: m));
+      }
+      return result;
+    }
+    return [];
+  }
+
+  N toModel<N extends M>(
+      List<dynamic> dbRow, List<OrmMetaField> selectedFields, String className,
+      {N? existModel}) {
+    N model = existModel ??
+        modelInspector.newInstance(className,
+            attachDb: true, topQuery: this.topQuery) as N;
+    modelInspector.markLoaded(model);
     for (int i = 0; i < dbRow.length; i++) {
       var f = selectedFields[i];
       var name = f.name;
       var value = dbRow[i];
       if (f.isModelType) {
         if (value != null) {
-          var obj = modelInspector.newInstance(f.elementType);
+          var obj = modelInspector.newInstance(f.elementType,
+              attachDb: true, topQuery: this.topQuery);
           modelInspector.setFieldValue(obj, 'id', value);
           modelInspector.setFieldValue(model, name, obj);
         }

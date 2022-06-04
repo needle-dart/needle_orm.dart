@@ -25,7 +25,9 @@ enum ActionType { Insert, Update, Delete }
 abstract class AbstractModelQuery<T, D> {
   AbstractModelQuery();
 
-  Future<T?> findById(D id);
+  Future<T?> findById(D id, {T? existModel});
+
+  Future<List<T>> findByIds(List idList, {List<Model>? existModeList});
 
   Future<List<T>> findList();
 }
