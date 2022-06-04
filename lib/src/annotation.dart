@@ -2,7 +2,7 @@
 
 abstract class Model {
   String get className;
-  Map<String, dynamic> toMap({bool ignoreNull = true});
+  Map<String, dynamic> toMap({String fields = '*', bool ignoreNull = true});
 }
 
 abstract class OrmAnnotation {
