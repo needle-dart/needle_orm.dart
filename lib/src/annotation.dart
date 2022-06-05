@@ -30,6 +30,8 @@ abstract class AbstractModelQuery<T, D> {
   Future<List<T>> findByIds(List idList, {List<Model>? existModeList});
 
   Future<List<T>> findList();
+
+  Future<int> count();
 }
 
 abstract class OrmClassAnnotation {}

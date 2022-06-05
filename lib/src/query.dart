@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:logging/logging.dart';
 
 import 'annotation.dart';
@@ -285,6 +287,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var action = ActionType.Insert;
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
+    var idField = clz.idFields().first;
     var tableName = clz.tableName;
     var dirtyMap = modelInspector.getDirtyFields(model);
     var ssFields = clz.serverSideFields(action, searchParents: true);
@@ -315,15 +318,83 @@ abstract class BaseModelQuery<M extends Model, D>
             modelInspector.getFieldValue(value, _clz!.idFields().first.name);
       }
     });
-    var id = await sqlExecutor.query(tableName, sql, dirtyMap, []);
+    var id =
+        await sqlExecutor.query(tableName, sql, dirtyMap, [idField.columnName]);
     _logger.fine(' >>> query returned: ${id}');
     if (id.isNotEmpty) {
       if (id[0].isNotEmpty) {
-        modelInspector.setFieldValue(model, "id", id[0][0]);
+        modelInspector.setFieldValue(model, idField.name, id[0][0]);
         return id[0][0];
       }
     }
     return 0;
+  }
+
+  Future<void> insertBatch(List<M> modelList) async {
+    if (modelList.isEmpty) return;
+    final block = 100;
+    if (modelList.length < block) return _insertBatch(modelList);
+
+    for (int i = 0; i < modelList.length; i += block) {
+      var sublist = modelList.sublist(i, min(modelList.length, i + block));
+      _insertBatch(sublist);
+    }
+  }
+
+  Future<void> _insertBatch(List<M> modelList) async {
+    if (modelList.isEmpty) return;
+    var count = modelList.length;
+    var action = ActionType.Insert;
+    var className = modelInspector.getClassName(modelList[0]);
+    var clz = modelInspector.meta(className)!;
+    var idField = clz.idFields().first;
+    var idColumnName = idField.columnName;
+    var tableName = clz.tableName;
+
+    // all but id fields
+    var allFields = clz
+        .allFields(searchParents: true)
+        .where((element) => !element.isIdField)
+        .toList();
+
+    var columnNames = allFields.map((e) => e.columnName).join(',');
+
+    var fieldVariables = [];
+    //allFields.map((e) => '@${e.name}').join(',');
+
+    for (int i = 0; i < count; i++) {
+      var one = allFields.map((e) => '@${e.name}_$i').join(',');
+      fieldVariables.add('( $one )');
+    }
+
+    var sql =
+        'insert into $tableName( $columnNames ) values ${fieldVariables.join(",")}';
+    _logger.fine('Insert SQL: $sql');
+
+    var dirtyMap = <String, dynamic>{};
+
+    allFields.forEach((f) {
+      for (int i = 0; i < count; i++) {
+        dirtyMap[f.name + '_$i'] =
+            modelInspector.getFieldValue(modelList[i], f.name);
+      }
+    });
+    dirtyMap.forEach((key, value) {
+      if (value is Model) {
+        var _clz = modelInspector.meta(modelInspector.getClassName(value));
+        dirtyMap[key] =
+            modelInspector.getFieldValue(value, _clz!.idFields().first.name);
+      }
+    });
+    var rows =
+        await sqlExecutor.query(tableName, sql, dirtyMap, [idColumnName]);
+    _logger.fine(' >>> query returned: ${rows}');
+    if (rows.isNotEmpty) {
+      for (int i = 0; i < rows.length; i++) {
+        var id = rows[i][0];
+        modelInspector.setFieldValue(modelList[i], idField.name, id);
+      }
+    }
   }
 
   Future<void> update(M model) async {
@@ -509,6 +580,37 @@ abstract class BaseModelQuery<M extends Model, D>
 
     // return sqlExecutor.findList(this);
     return result.toList();
+  }
+
+  @override
+  Future<int> count() async {
+    // init all table aliases.
+    _beforeQuery();
+
+    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+
+    var idColumnName = clz.idFields().first.columnName;
+
+    SqlQuery q = SqlQuery(tableName, _alias);
+
+    // _allJoins().map((e) => )
+    q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
+
+    var conditions = columns.fold<List<SqlCondition>>(
+        [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
+
+    q.conditions.appendAll(conditions);
+
+    var sql = q.toCountSql(idColumnName);
+    var params = q.params;
+
+    var rows = await sqlExecutor.query(tableName, sql, params);
+
+    _logger.fine('\t sql: $sql');
+    _logger.fine('\t rows: ${rows.length} \t\t $rows');
+    _logger.fine('\t count type ${rows[0][0].runtimeType}');
+    return (rows[0][0]).toInt();
   }
 
   T findQuery<T extends BaseModelQuery>(String modelName, String propName) {

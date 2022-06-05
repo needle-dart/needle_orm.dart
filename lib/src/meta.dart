@@ -91,6 +91,8 @@ class OrmMetaField {
 
   bool get isModelType => clz.modelInspector.isModelType(elementType);
 
+  bool get isIdField => ormAnnotations.whereType<ID>().isNotEmpty;
+
   String get elementType {
     var t = type;
     if (t.startsWith('List<')) {

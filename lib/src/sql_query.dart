@@ -29,6 +29,23 @@ class SqlQuery {
     ].where((element) => element.isNotEmpty).join(' ');
   }
 
+  String toCountSql(String idColumnName) {
+    var where = [
+      conditions.toSql(wrap: false),
+      ...joins.map((e) => e.conditions.toSql(wrap: false))
+    ].where((element) => element.trim().length > 0).join(' AND ');
+
+    if (where.isNotEmpty) where = 'where ' + where;
+    return [
+      'select count( distinct $idColumnName ) ',
+      'from',
+      tableName,
+      alias,
+      joins.toSql(),
+      where,
+    ].where((element) => element.isNotEmpty).join(' ');
+  }
+
   Map<String, dynamic> get params => {...conditions.params, ...joins.params};
 }
 
