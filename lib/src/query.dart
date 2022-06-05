@@ -330,14 +330,13 @@ abstract class BaseModelQuery<M extends Model, D>
     return 0;
   }
 
-  Future<void> insertBatch(List<M> modelList) async {
+  Future<void> insertBatch(List<M> modelList, {int batchSize = 100}) async {
     if (modelList.isEmpty) return;
-    final block = 100;
-    if (modelList.length < block) return _insertBatch(modelList);
+    if (modelList.length <= batchSize) return _insertBatch(modelList);
 
-    for (int i = 0; i < modelList.length; i += block) {
-      var sublist = modelList.sublist(i, min(modelList.length, i + block));
-      _insertBatch(sublist);
+    for (int i = 0; i < modelList.length; i += batchSize) {
+      var sublist = modelList.sublist(i, min(modelList.length, i + batchSize));
+      await _insertBatch(sublist);
     }
   }
 
