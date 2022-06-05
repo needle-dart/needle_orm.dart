@@ -90,6 +90,23 @@ class ColumnQuery<T, R> {
     }
     return sc;
   }
+
+  OrderField asc() => OrderField(this, Order.asc);
+
+  OrderField desc() => OrderField(this, Order.desc);
+}
+
+enum Order { asc, desc }
+
+class OrderField {
+  ColumnQuery column;
+  Order order;
+  OrderField(this.column, this.order);
+
+  @override
+  String toString() {
+    return column.name + (order == Order.desc ? ' desc' : '');
+  }
 }
 
 class ServerSideExpr {
@@ -244,6 +261,10 @@ abstract class BaseModelQuery<M extends Model, D>
   List<ColumnQuery> get columns;
 
   List<BaseModelQuery> get joins;
+
+  List<OrderField> orders = [];
+  int offset = 0;
+  int maxRows = 0;
 
   // for join
   BaseModelQuery? relatedQuery;
@@ -519,6 +540,11 @@ abstract class BaseModelQuery<M extends Model, D>
     return [];
   }
 
+  paging(int pageNumber, int pageSize) {
+    maxRows = pageSize;
+    offset = pageNumber * pageSize;
+  }
+
   N toModel<N extends M>(
       List<dynamic> dbRow, List<OrmMetaField> selectedFields, String className,
       {N? existModel}) {
@@ -567,6 +593,18 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var sql = q.toSql();
     var params = q.params;
+
+    if (orders.isNotEmpty) {
+      sql += ' order by ' + orders.map((e) => e.toString()).join(',');
+    }
+
+    if (maxRows > 0) {
+      sql += ' limit $maxRows';
+    }
+
+    if (offset > 0) {
+      sql += ' offset $offset';
+    }
 
     var rows = await sqlExecutor.query(tableName, sql, params);
 

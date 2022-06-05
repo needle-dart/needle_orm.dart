@@ -37,7 +37,7 @@ class SqlQuery {
 
     if (where.isNotEmpty) where = 'where ' + where;
     return [
-      'select count( distinct $idColumnName ) ',
+      'select count( distinct $alias.$idColumnName ) ',
       'from',
       tableName,
       alias,
