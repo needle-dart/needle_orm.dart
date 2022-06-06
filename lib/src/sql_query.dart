@@ -8,7 +8,7 @@ class SqlQuery {
 
   SqlQuery(this.tableName, this.alias, {this.distinct = false});
 
-  String toSql() {
+  String toSelectSql() {
     distinct = distinct || joins.any((element) => element.distinct);
 
     var where = [
@@ -26,6 +26,62 @@ class SqlQuery {
       alias,
       joins.toSql(),
       where,
+    ].where((element) => element.isNotEmpty).join(' ');
+  }
+
+  String toSoftDeleteSql(String idColumnName, String softDeleteColumnName) {
+    var where = [
+      conditions.toSql(wrap: false),
+      ...joins.map((e) => e.conditions.toSql(wrap: false))
+    ].where((element) => element.trim().length > 0).join(' AND ');
+
+    if (where.isNotEmpty) where = 'where ' + where;
+    return [
+      'update',
+      tableName,
+      'set',
+      softDeleteColumnName,
+      '=1',
+      'where',
+      idColumnName,
+      'in',
+      '('
+          'select',
+      distinct ? 'distinct' : '',
+      '$alias.$idColumnName',
+      'from',
+      tableName,
+      alias,
+      joins.toSql(),
+      where,
+      ')'
+    ].where((element) => element.isNotEmpty).join(' ');
+  }
+
+  String toPermanentDeleteSql(String idColumnName) {
+    var where = [
+      conditions.toSql(wrap: false),
+      ...joins.map((e) => e.conditions.toSql(wrap: false))
+    ].where((element) => element.trim().length > 0).join(' AND ');
+
+    if (where.isNotEmpty) where = 'where ' + where;
+    return [
+      'delete',
+      'from',
+      tableName,
+      'where',
+      idColumnName,
+      'in',
+      '('
+          'select',
+      distinct ? 'distinct' : '',
+      '$alias.$idColumnName',
+      'from',
+      tableName,
+      alias,
+      joins.toSql(),
+      where,
+      ')'
     ].where((element) => element.isNotEmpty).join(' ');
   }
 

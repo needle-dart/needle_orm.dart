@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:logging/logging.dart';
 
-import 'annotation.dart';
+import 'core.dart';
 import 'inspector.dart';
 import 'meta.dart';
 import 'sql.dart';
@@ -245,7 +245,7 @@ String toSql(ColumnConditionOper oper) {
 abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
   static Logger _logger = Logger('ORM');
-  final DataSource ds;
+  final Database ds;
   final ModelInspector modelInspector;
 
   late BaseModelQuery _topQuery;
@@ -461,20 +461,89 @@ abstract class BaseModelQuery<M extends Model, D>
     await ds.query(sql, dirtyMap, tableName: tableName);
   }
 
-  Future<void> delete(M model) async {
+  Future<void> deleteOne(M model) async {
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
+    var softDeleteField = clz.softDeleteField();
+    if (softDeleteField == null) {
+      return deleteOnePermanent(model);
+    }
+    var idField = clz.idFields().first;
+    var idValue = modelInspector.getFieldValue(model, idField.name);
     var tableName = clz.tableName;
-    _logger.fine(
-        'delete $tableName , fields: ${modelInspector.getDirtyFields(model)}');
+    _logger.fine('delete $tableName , fields: ${idValue}');
+    var sql =
+        'update $tableName set ${softDeleteField.columnName} = 1 where ${idField.columnName} = @id ';
+    await ds.query(sql, {"id": idValue}, tableName: tableName);
   }
 
-  Future<void> deletePermanent(M model) async {
+  Future<void> deleteOnePermanent(M model) async {
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
+    var idField = clz.idFields().first;
+    var idValue = modelInspector.getFieldValue(model, idField.name);
     var tableName = clz.tableName;
-    _logger.fine(
-        'deletePermanent $tableName , fields: ${modelInspector.getDirtyFields(model)}');
+    _logger.fine('deleteOnePermanent $tableName , id: $idValue');
+    var sql = 'delete $tableName where ${idField.columnName} = @id ';
+    await ds.query(sql, {"id": idValue}, tableName: tableName);
+  }
+
+  Future<int> delete() async {
+    // init all table aliases.
+    _beforeQuery();
+
+    var clz = modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+    var idField = clz.idFields().first;
+    var softDeleteField = clz.softDeleteField();
+
+    if (softDeleteField == null) {
+      return deletePermanent();
+    }
+
+    SqlQuery q = SqlQuery(tableName, _alias);
+
+    // _allJoins().map((e) => )
+    q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
+
+    var conditions = columns.fold<List<SqlCondition>>(
+        [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
+
+    q.conditions.appendAll(conditions);
+
+    var sql = q.toSoftDeleteSql(idField.columnName, softDeleteField.columnName);
+    var params = q.params;
+    _logger.fine('\t soft delete sql: $sql');
+    var rows = await ds.query(sql, params, tableName: tableName);
+    _logger.fine('\t soft delete result rows: ${rows.affectedRowCount}');
+    return rows.affectedRowCount ?? -1;
+  }
+
+  Future<int> deletePermanent() async {
+    // init all table aliases.
+    _beforeQuery();
+
+    var clz = modelInspector.meta(className)!;
+    var tableName = clz.tableName;
+    var idField = clz.idFields().first;
+
+    SqlQuery q = SqlQuery(tableName, _alias);
+
+    // _allJoins().map((e) => )
+    q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
+
+    var conditions = columns.fold<List<SqlCondition>>(
+        [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
+
+    q.conditions.appendAll(conditions);
+
+    var sql = q.toPermanentDeleteSql(idField.columnName);
+    var params = q.params;
+    _logger.fine('\t hard delete sql: $sql');
+
+    var rows = await ds.query(sql, params, tableName: tableName);
+    _logger.fine('\t hard delete result rows: ${rows.affectedRowCount}');
+    return rows.affectedRowCount ?? -1;
   }
 
   Future<M?> findById(D id, {M? existModel}) async {
@@ -591,7 +660,7 @@ abstract class BaseModelQuery<M extends Model, D>
 
     q.conditions.appendAll(conditions);
 
-    var sql = q.toSql();
+    var sql = q.toSelectSql();
     var params = q.params;
 
     if (orders.isNotEmpty) {
@@ -645,7 +714,6 @@ abstract class BaseModelQuery<M extends Model, D>
 
     _logger.fine('\t sql: $sql');
     _logger.fine('\t rows: ${rows.length} \t\t $rows');
-    _logger.fine('\t count type ${rows[0][0].runtimeType}');
     return (rows[0][0]).toInt();
   }
 

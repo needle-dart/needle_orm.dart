@@ -33,5 +33,9 @@ abstract class ModelInspector<M> {
     return meta(className)?.idFields();
   }
 
+  List<OrmMetaField>? softDeleteField(String className) {
+    return meta(className)?.idFields();
+  }
+
   void markLoaded(M model);
 }

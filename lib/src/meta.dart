@@ -1,4 +1,4 @@
-import 'annotation.dart';
+import 'core.dart';
 
 import 'package:recase/recase.dart';
 import 'package:inflection3/inflection3.dart';
@@ -60,6 +60,12 @@ class OrmMetaClass {
     return allFields(searchParents: true)
         .where((f) => f.ormAnnotations.any((annot) => annot.runtimeType == ID))
         .toList();
+  }
+
+  OrmMetaField? softDeleteField() {
+    return allFields(searchParents: true).firstWhere(
+        (f) => f.ormAnnotations.any((annot) => annot.runtimeType == SoftDelete),
+        orElse: null);
   }
 
   List<OrmMetaField> serverSideFields(ActionType actionType,

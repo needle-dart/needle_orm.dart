@@ -1,17 +1,20 @@
 import 'dart:async';
 
-abstract class DataSource {
+enum DatabaseType { MariaDB, PostgreSQL }
+
+abstract class Database {
   final DatabaseType databaseType;
   final String databaseVersion;
 
-  const DataSource(this.databaseType, this.databaseVersion);
+  const Database(this.databaseType, this.databaseVersion);
 
-  factory DataSource.lookup(String dsName) {
+  factory Database.lookup(String dsName) {
     throw 'DataSource[$dsName] not exist!';
   }
 
   /// Executes a single query.
-  Future<List<List>> query(String sql, Map<String, dynamic> substitutionValues,
+  Future<DbQueryResult> query(
+      String sql, Map<String, dynamic> substitutionValues,
       {List<String> returningFields = const [], String? tableName});
 
   /// Enters a database transaction, performing the actions within,
@@ -22,9 +25,21 @@ abstract class DataSource {
   ///
   /// Whether nested transactions are supported depends on the
   /// underlying driver.
-  Future<T> transaction<T>(FutureOr<T> Function(DataSource) f);
+  Future<T> transaction<T>(FutureOr<T> Function(Database) f);
 
   Future<void> close();
 }
 
-enum DatabaseType { MySQL, MariaDB, PostgreSQL, Sqlite }
+abstract class DbQueryResult implements List<List> {
+  /// How many rows did this query affect?
+  int? get affectedRowCount;
+  List<DbColumnDescription> get columnDescriptions;
+}
+
+abstract class DbColumnDescription {
+  /// The name of the column returned by the query.
+  String get columnName;
+
+  /// The resolved name of the referenced table.
+  String get tableName;
+}

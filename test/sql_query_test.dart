@@ -40,7 +40,7 @@ void main() {
     q.conditions
       ..append(C("u.deleted = 0"))
       ..append(C("u.email like @u__email", {'u__email': '%@gmail.com'}));
-    expect(q.toSql(),
+    expect(q.toSelectSql(),
         'select distinct u.id, u.name, u.email, u.deleted from user u LEFT join user_role ur on ur.user_id = u.id LEFT join role r on r.id=ur.role_id where u.deleted = 0 AND u.email like @u__email AND r.deleted = 0 AND r.name like @r__role_name');
     expect(q.joins.params['r__role_name'], '%member');
     expect(q.conditions.params['u__email'], '%@gmail.com');

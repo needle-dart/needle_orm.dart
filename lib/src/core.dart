@@ -31,6 +31,12 @@ abstract class AbstractModelQuery<T, D> {
 
   Future<List<T>> findList();
 
+  /// return how many rows affected!
+  Future<int> delete();
+
+  /// return how many rows affected!
+  Future<int> deletePermanent();
+
   Future<int> count();
 }
 
