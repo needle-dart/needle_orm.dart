@@ -5,7 +5,7 @@ import 'package:logging/logging.dart';
 import 'annotation.dart';
 import 'inspector.dart';
 import 'meta.dart';
-import 'sql_executor.dart';
+import 'sql.dart';
 import 'sql_query.dart';
 import 'common.dart';
 
@@ -245,7 +245,7 @@ String toSql(ColumnConditionOper oper) {
 abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
   static Logger _logger = Logger('ORM');
-  final SqlExecutor sqlExecutor;
+  final DataSource ds;
   final ModelInspector modelInspector;
 
   late BaseModelQuery _topQuery;
@@ -270,7 +270,7 @@ abstract class BaseModelQuery<M extends Model, D>
   BaseModelQuery? relatedQuery;
   String? propName;
 
-  BaseModelQuery(this.modelInspector, this.sqlExecutor,
+  BaseModelQuery(this.modelInspector, this.ds,
       {BaseModelQuery? topQuery, this.propName}) {
     this._topQuery = topQuery ?? this;
   }
@@ -292,7 +292,7 @@ abstract class BaseModelQuery<M extends Model, D>
   BaseModelQuery get topQuery => _topQuery;
 
   SqlJoin _toSqlJoin() {
-    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
 
     var joinStmt = '${relatedQuery!._alias}.${propName}_id = ${_alias}.id';
@@ -339,8 +339,8 @@ abstract class BaseModelQuery<M extends Model, D>
             modelInspector.getFieldValue(value, _clz!.idFields().first.name);
       }
     });
-    var id =
-        await sqlExecutor.query(tableName, sql, dirtyMap, [idField.columnName]);
+    var id = await ds.query(sql, dirtyMap,
+        returningFields: [idField.columnName], tableName: tableName);
     _logger.fine(' >>> query returned: ${id}');
     if (id.isNotEmpty) {
       if (id[0].isNotEmpty) {
@@ -406,8 +406,8 @@ abstract class BaseModelQuery<M extends Model, D>
             modelInspector.getFieldValue(value, _clz!.idFields().first.name);
       }
     });
-    var rows =
-        await sqlExecutor.query(tableName, sql, dirtyMap, [idColumnName]);
+    var rows = await ds.query(sql, dirtyMap,
+        returningFields: [idColumnName], tableName: tableName);
     _logger.fine(' >>> query returned: ${rows}');
     if (rows.isNotEmpty) {
       for (int i = 0; i < rows.length; i++) {
@@ -458,7 +458,7 @@ abstract class BaseModelQuery<M extends Model, D>
       }
     });
 
-    await sqlExecutor.query(tableName, sql, dirtyMap);
+    await ds.query(sql, dirtyMap, tableName: tableName);
   }
 
   Future<void> delete(M model) async {
@@ -491,7 +491,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var sql = 'select $columnNames from $tableName where $idFieldName = $id';
     _logger.fine('findById: ${className} [$id] => $sql');
 
-    var rows = await sqlExecutor.query(tableName, sql, {});
+    var rows = await ds.query(sql, {}, tableName: tableName);
 
     if (rows.isNotEmpty) {
       return toModel(rows[0], allFields, className, existModel: existModel);
@@ -514,7 +514,7 @@ abstract class BaseModelQuery<M extends Model, D>
         'select $columnNames from $tableName where $idFieldName in @idList';
     _logger.fine('findByIds: ${className} $idList => $sql');
 
-    var rows = await sqlExecutor.query(tableName, sql, {'idList': idList});
+    var rows = await ds.query(sql, {'idList': idList}, tableName: tableName);
 
     if (rows.isNotEmpty) {
       var idIndex = 0;
@@ -575,7 +575,7 @@ abstract class BaseModelQuery<M extends Model, D>
     // init all table aliases.
     _beforeQuery();
 
-    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
 
     var allFields = clz.allFields(searchParents: true);
@@ -606,7 +606,7 @@ abstract class BaseModelQuery<M extends Model, D>
       sql += ' offset $offset';
     }
 
-    var rows = await sqlExecutor.query(tableName, sql, params);
+    var rows = await ds.query(sql, params, tableName: tableName);
 
     _logger.fine('\t sql: $sql');
     _logger.fine('\t rows: ${rows.length}');
@@ -615,7 +615,6 @@ abstract class BaseModelQuery<M extends Model, D>
       return toModel<M>(row, allFields, className);
     });
 
-    // return sqlExecutor.findList(this);
     return result.toList();
   }
 
@@ -624,7 +623,7 @@ abstract class BaseModelQuery<M extends Model, D>
     // init all table aliases.
     _beforeQuery();
 
-    var clz = sqlExecutor.modelInspector.meta(className)!;
+    var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
 
     var idColumnName = clz.idFields().first.columnName;
@@ -642,7 +641,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var sql = q.toCountSql(idColumnName);
     var params = q.params;
 
-    var rows = await sqlExecutor.query(tableName, sql, params);
+    var rows = await ds.query(sql, params, tableName: tableName);
 
     _logger.fine('\t sql: $sql');
     _logger.fine('\t rows: ${rows.length} \t\t $rows');

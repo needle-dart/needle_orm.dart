@@ -11,9 +11,8 @@ abstract class DataSource {
   }
 
   /// Executes a single query.
-  Future<List<List>> execute(
-      String tableName, String sql, Map<String, dynamic> substitutionValues,
-      [List<String> returningFields = const []]);
+  Future<List<List>> query(String sql, Map<String, dynamic> substitutionValues,
+      {List<String> returningFields = const [], String? tableName});
 
   /// Enters a database transaction, performing the actions within,
   /// and returning the results of [f].
@@ -24,6 +23,8 @@ abstract class DataSource {
   /// Whether nested transactions are supported depends on the
   /// underlying driver.
   Future<T> transaction<T>(FutureOr<T> Function(DataSource) f);
+
+  Future<void> close();
 }
 
 enum DatabaseType { MySQL, MariaDB, PostgreSQL, Sqlite }
