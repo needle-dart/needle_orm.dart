@@ -308,10 +308,10 @@ abstract class BaseModelQuery<M extends Model, D>
     var action = ActionType.Insert;
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
-    var idField = clz.idFields().first;
+    var idField = clz.idFields.first;
     var tableName = clz.tableName;
 
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
     if (softDeleteField != null) {
       modelInspector.markDeleted(model, false);
     }
@@ -342,7 +342,7 @@ abstract class BaseModelQuery<M extends Model, D>
       if (value is Model) {
         var _clz = modelInspector.meta(modelInspector.getClassName(value));
         dirtyMap[key] =
-            modelInspector.getFieldValue(value, _clz!.idFields().first.name);
+            modelInspector.getFieldValue(value, _clz!.idFields.first.name);
       }
     });
     var id = await ds.query(sql, dirtyMap,
@@ -373,11 +373,11 @@ abstract class BaseModelQuery<M extends Model, D>
     var action = ActionType.Insert;
     var className = modelInspector.getClassName(modelList[0]);
     var clz = modelInspector.meta(className)!;
-    var idField = clz.idFields().first;
+    var idField = clz.idFields.first;
     var idColumnName = idField.columnName;
     var tableName = clz.tableName;
 
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
     if (softDeleteField != null) {
       modelList.forEach((model) {
         modelInspector.markDeleted(model, false);
@@ -416,7 +416,7 @@ abstract class BaseModelQuery<M extends Model, D>
       if (value is Model) {
         var _clz = modelInspector.meta(modelInspector.getClassName(value));
         dirtyMap[key] =
-            modelInspector.getFieldValue(value, _clz!.idFields().first.name);
+            modelInspector.getFieldValue(value, _clz!.idFields.first.name);
       }
     });
     var rows = await ds.query(sql, dirtyMap,
@@ -437,7 +437,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var tableName = clz.tableName;
     var dirtyMap = modelInspector.getDirtyFields(model);
 
-    var idField = clz.idFields().first; // @TODO
+    var idField = clz.idFields.first; // @TODO
 
     var idValue = dirtyMap.remove(idField.name);
 
@@ -467,7 +467,7 @@ abstract class BaseModelQuery<M extends Model, D>
       if (value is Model) {
         var _clz = modelInspector.meta(modelInspector.getClassName(value));
         dirtyMap[key] =
-            modelInspector.getFieldValue(value, _clz!.idFields().first.name);
+            modelInspector.getFieldValue(value, _clz!.idFields.first.name);
       }
     });
 
@@ -477,11 +477,11 @@ abstract class BaseModelQuery<M extends Model, D>
   Future<void> deleteOne(M model) async {
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
     if (softDeleteField == null) {
       return deleteOnePermanent(model);
     }
-    var idField = clz.idFields().first;
+    var idField = clz.idFields.first;
     var idValue = modelInspector.getFieldValue(model, idField.name);
     var tableName = clz.tableName;
     _logger.fine('delete $tableName , fields: ${idValue}');
@@ -493,7 +493,7 @@ abstract class BaseModelQuery<M extends Model, D>
   Future<void> deleteOnePermanent(M model) async {
     var className = modelInspector.getClassName(model);
     var clz = modelInspector.meta(className)!;
-    var idField = clz.idFields().first;
+    var idField = clz.idFields.first;
     var idValue = modelInspector.getFieldValue(model, idField.name);
     var tableName = clz.tableName;
     _logger.fine('deleteOnePermanent $tableName , id: $idValue');
@@ -507,8 +507,8 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    var idField = clz.idFields().first;
-    var softDeleteField = clz.softDeleteField();
+    var idField = clz.idFields.first;
+    var softDeleteField = clz.softDeleteField;
 
     if (softDeleteField == null) {
       return deletePermanent();
@@ -538,7 +538,7 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    var idField = clz.idFields().first;
+    var idField = clz.idFields.first;
 
     SqlQuery q = SqlQuery(tableName, _alias);
 
@@ -564,9 +564,9 @@ abstract class BaseModelQuery<M extends Model, D>
     var clz = modelInspector.meta(className)!;
 
     var idFields = clz.idFields;
-    var idFieldName = idFields().first.name;
+    var idFieldName = idFields.first.name;
     var tableName = clz.tableName;
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
 
     var allFields = clz.allFields(searchParents: true);
 
@@ -592,9 +592,9 @@ abstract class BaseModelQuery<M extends Model, D>
     var clz = modelInspector.meta(className)!;
 
     var idFields = clz.idFields;
-    var idFieldName = idFields().first.name;
+    var idFieldName = idFields.first.name;
     var tableName = clz.tableName;
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
 
     var allFields = clz.allFields(searchParents: true);
 
@@ -671,7 +671,7 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
 
     var allFields = clz.allFields(searchParents: true);
 
@@ -724,9 +724,9 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
-    var softDeleteField = clz.softDeleteField();
+    var softDeleteField = clz.softDeleteField;
 
-    var idColumnName = clz.idFields().first.columnName;
+    var idColumnName = clz.idFields.first.columnName;
 
     SqlQuery q = SqlQuery(tableName, _alias);
 

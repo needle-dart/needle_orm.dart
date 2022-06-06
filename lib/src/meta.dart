@@ -56,17 +56,15 @@ class OrmMetaClass {
     return null;
   }
 
-  List<OrmMetaField> idFields() {
-    return allFields(searchParents: true)
-        .where((f) => f.ormAnnotations.any((annot) => annot.runtimeType == ID))
-        .toList();
-  }
+  List<OrmMetaField> get idFields => allFields(searchParents: true)
+      .where((f) => f.ormAnnotations.any((annot) => annot.runtimeType == ID))
+      .toList();
 
-  OrmMetaField? softDeleteField() {
-    return allFields(searchParents: true).firstWhere(
-        (f) => f.ormAnnotations.any((annot) => annot.runtimeType == SoftDelete),
-        orElse: null);
-  }
+  OrmMetaField? get softDeleteField =>
+      allFields(searchParents: true).firstWhere(
+          (f) =>
+              f.ormAnnotations.any((annot) => annot.runtimeType == SoftDelete),
+          orElse: null);
 
   List<OrmMetaField> serverSideFields(ActionType actionType,
       {bool searchParents = false}) {
