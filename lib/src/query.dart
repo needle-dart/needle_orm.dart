@@ -310,6 +310,12 @@ abstract class BaseModelQuery<M extends Model, D>
     var clz = modelInspector.meta(className)!;
     var idField = clz.idFields().first;
     var tableName = clz.tableName;
+
+    var softDeleteField = clz.softDeleteField();
+    if (softDeleteField != null) {
+      modelInspector.markDeleted(model, false);
+    }
+
     var dirtyMap = modelInspector.getDirtyFields(model);
     var ssFields = clz.serverSideFields(action, searchParents: true);
 
@@ -370,6 +376,13 @@ abstract class BaseModelQuery<M extends Model, D>
     var idField = clz.idFields().first;
     var idColumnName = idField.columnName;
     var tableName = clz.tableName;
+
+    var softDeleteField = clz.softDeleteField();
+    if (softDeleteField != null) {
+      modelList.forEach((model) {
+        modelInspector.markDeleted(model, false);
+      });
+    }
 
     // all but id fields
     var allFields = clz
@@ -546,18 +559,24 @@ abstract class BaseModelQuery<M extends Model, D>
     return rows.affectedRowCount ?? -1;
   }
 
-  Future<M?> findById(D id, {M? existModel}) async {
+  Future<M?> findById(D id,
+      {M? existModel, bool includeSoftDeleted = false}) async {
     var clz = modelInspector.meta(className)!;
 
     var idFields = clz.idFields;
     var idFieldName = idFields().first.name;
     var tableName = clz.tableName;
+    var softDeleteField = clz.softDeleteField();
 
     var allFields = clz.allFields(searchParents: true);
 
     var columnNames = allFields.map((f) => f.columnName).join(',');
 
     var sql = 'select $columnNames from $tableName where $idFieldName = $id';
+    if (softDeleteField != null && !includeSoftDeleted) {
+      sql += ' and ${softDeleteField.columnName}=0 ';
+    }
+
     _logger.fine('findById: ${className} [$id] => $sql');
 
     var rows = await ds.query(sql, {}, tableName: tableName);
@@ -568,12 +587,14 @@ abstract class BaseModelQuery<M extends Model, D>
     return null;
   }
 
-  Future<List<M>> findByIds(List idList, {List<Model>? existModeList}) async {
+  Future<List<M>> findByIds(List idList,
+      {List<Model>? existModeList, bool includeSoftDeleted = false}) async {
     var clz = modelInspector.meta(className)!;
 
     var idFields = clz.idFields;
     var idFieldName = idFields().first.name;
     var tableName = clz.tableName;
+    var softDeleteField = clz.softDeleteField();
 
     var allFields = clz.allFields(searchParents: true);
 
@@ -581,6 +602,10 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var sql =
         'select $columnNames from $tableName where $idFieldName in @idList';
+
+    if (softDeleteField != null && !includeSoftDeleted) {
+      sql += ' and ${softDeleteField.columnName}=0 ';
+    }
     _logger.fine('findByIds: ${className} $idList => $sql');
 
     var rows = await ds.query(sql, {'idList': idList}, tableName: tableName);
@@ -640,12 +665,13 @@ abstract class BaseModelQuery<M extends Model, D>
   }
 
   @override
-  Future<List<M>> findList() async {
+  Future<List<M>> findList({bool includeSoftDeleted = false}) async {
     // init all table aliases.
     _beforeQuery();
 
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
+    var softDeleteField = clz.softDeleteField();
 
     var allFields = clz.allFields(searchParents: true);
 
@@ -655,9 +681,13 @@ abstract class BaseModelQuery<M extends Model, D>
     // _allJoins().map((e) => )
     q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
 
+    if (softDeleteField != null && !includeSoftDeleted) {
+      q.conditions
+          .append(SqlCondition('$_alias.${softDeleteField.columnName}=0'));
+    }
+
     var conditions = columns.fold<List<SqlCondition>>(
         [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
-
     q.conditions.appendAll(conditions);
 
     var sql = q.toSelectSql();
@@ -688,12 +718,13 @@ abstract class BaseModelQuery<M extends Model, D>
   }
 
   @override
-  Future<int> count() async {
+  Future<int> count({bool includeSoftDeleted = false}) async {
     // init all table aliases.
     _beforeQuery();
 
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
+    var softDeleteField = clz.softDeleteField();
 
     var idColumnName = clz.idFields().first.columnName;
 
@@ -702,9 +733,13 @@ abstract class BaseModelQuery<M extends Model, D>
     // _allJoins().map((e) => )
     q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
 
+    if (softDeleteField != null && !includeSoftDeleted) {
+      q.conditions
+          .append(SqlCondition('$_alias.${softDeleteField.columnName}=0'));
+    }
+
     var conditions = columns.fold<List<SqlCondition>>(
         [], (init, e) => init..addAll(e.toSqlConditions(_alias)));
-
     q.conditions.appendAll(conditions);
 
     var sql = q.toCountSql(idColumnName);

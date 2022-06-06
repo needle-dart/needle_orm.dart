@@ -17,6 +17,8 @@ abstract class ModelInspector<M> {
 
   dynamic getFieldValue(M model, String fieldName);
 
+  void markDeleted(M model, bool deleted);
+
   void setFieldValue(M model, String fieldName, dynamic value);
 
   void loadModel(M model, Map<String, dynamic> m,
