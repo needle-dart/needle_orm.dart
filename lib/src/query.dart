@@ -245,7 +245,7 @@ String toSql(ColumnConditionOper oper) {
 abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
   static Logger _logger = Logger('ORM');
-  final Database ds;
+  final Database db;
   final ModelInspector modelInspector;
 
   late BaseModelQuery _topQuery;
@@ -270,7 +270,7 @@ abstract class BaseModelQuery<M extends Model, D>
   BaseModelQuery? relatedQuery;
   String? propName;
 
-  BaseModelQuery(this.modelInspector, this.ds,
+  BaseModelQuery(this.modelInspector, this.db,
       {BaseModelQuery? topQuery, this.propName}) {
     this._topQuery = topQuery ?? this;
   }
@@ -345,7 +345,7 @@ abstract class BaseModelQuery<M extends Model, D>
             modelInspector.getFieldValue(value, _clz!.idFields.first.name);
       }
     });
-    var id = await ds.query(sql, dirtyMap,
+    var id = await db.query(sql, dirtyMap,
         returningFields: [idField.columnName], tableName: tableName);
     _logger.fine(' >>> query returned: ${id}');
     if (id.isNotEmpty) {
@@ -419,7 +419,7 @@ abstract class BaseModelQuery<M extends Model, D>
             modelInspector.getFieldValue(value, _clz!.idFields.first.name);
       }
     });
-    var rows = await ds.query(sql, dirtyMap,
+    var rows = await db.query(sql, dirtyMap,
         returningFields: [idColumnName], tableName: tableName);
     _logger.fine(' >>> query returned: ${rows}');
     if (rows.isNotEmpty) {
@@ -471,7 +471,7 @@ abstract class BaseModelQuery<M extends Model, D>
       }
     });
 
-    await ds.query(sql, dirtyMap, tableName: tableName);
+    await db.query(sql, dirtyMap, tableName: tableName);
   }
 
   Future<void> deleteOne(M model) async {
@@ -487,7 +487,7 @@ abstract class BaseModelQuery<M extends Model, D>
     _logger.fine('delete $tableName , fields: ${idValue}');
     var sql =
         'update $tableName set ${softDeleteField.columnName} = 1 where ${idField.columnName} = @id ';
-    await ds.query(sql, {"id": idValue}, tableName: tableName);
+    await db.query(sql, {"id": idValue}, tableName: tableName);
   }
 
   Future<void> deleteOnePermanent(M model) async {
@@ -498,7 +498,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var tableName = clz.tableName;
     _logger.fine('deleteOnePermanent $tableName , id: $idValue');
     var sql = 'delete $tableName where ${idField.columnName} = @id ';
-    await ds.query(sql, {"id": idValue}, tableName: tableName);
+    await db.query(sql, {"id": idValue}, tableName: tableName);
   }
 
   Future<int> delete() async {
@@ -527,7 +527,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var sql = q.toSoftDeleteSql(idField.columnName, softDeleteField.columnName);
     var params = q.params;
     _logger.fine('\t soft delete sql: $sql');
-    var rows = await ds.query(sql, params, tableName: tableName);
+    var rows = await db.query(sql, params, tableName: tableName);
     _logger.fine('\t soft delete result rows: ${rows.affectedRowCount}');
     return rows.affectedRowCount ?? -1;
   }
@@ -554,7 +554,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var params = q.params;
     _logger.fine('\t hard delete sql: $sql');
 
-    var rows = await ds.query(sql, params, tableName: tableName);
+    var rows = await db.query(sql, params, tableName: tableName);
     _logger.fine('\t hard delete result rows: ${rows.affectedRowCount}');
     return rows.affectedRowCount ?? -1;
   }
@@ -573,13 +573,16 @@ abstract class BaseModelQuery<M extends Model, D>
     var columnNames = allFields.map((f) => f.columnName).join(',');
 
     var sql = 'select $columnNames from $tableName where $idFieldName = $id';
+    var params = <String, dynamic>{};
+
     if (softDeleteField != null && !includeSoftDeleted) {
-      sql += ' and ${softDeleteField.columnName}=0 ';
+      sql += ' and ${softDeleteField.columnName}=@_deleted ';
+      params['_deleted'] = false;
     }
 
     _logger.fine('findById: ${className} [$id] => $sql');
 
-    var rows = await ds.query(sql, {}, tableName: tableName);
+    var rows = await db.query(sql, params, tableName: tableName);
 
     if (rows.isNotEmpty) {
       return toModel(rows[0], allFields, className, existModel: existModel);
@@ -602,13 +605,14 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var sql =
         'select $columnNames from $tableName where $idFieldName in @idList';
-
+    var params = <String, dynamic>{'idList': idList};
     if (softDeleteField != null && !includeSoftDeleted) {
-      sql += ' and ${softDeleteField.columnName}=0 ';
+      sql += ' and ${softDeleteField.columnName}=@_deleted ';
+      params['_deleted'] = false;
     }
     _logger.fine('findByIds: ${className} $idList => $sql');
 
-    var rows = await ds.query(sql, {'idList': idList}, tableName: tableName);
+    var rows = await db.query(sql, params, tableName: tableName);
 
     if (rows.isNotEmpty) {
       var idIndex = 0;
@@ -682,8 +686,8 @@ abstract class BaseModelQuery<M extends Model, D>
     q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
 
     if (softDeleteField != null && !includeSoftDeleted) {
-      q.conditions
-          .append(SqlCondition('$_alias.${softDeleteField.columnName}=0'));
+      q.conditions.append(
+          SqlCondition('$_alias.${softDeleteField.columnName}=@_deleted'));
     }
 
     var conditions = columns.fold<List<SqlCondition>>(
@@ -692,6 +696,9 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var sql = q.toSelectSql();
     var params = q.params;
+    if (softDeleteField != null && !includeSoftDeleted) {
+      params['_deleted'] = false;
+    }
 
     if (orders.isNotEmpty) {
       sql += ' order by ' + orders.map((e) => e.toString()).join(',');
@@ -705,7 +712,7 @@ abstract class BaseModelQuery<M extends Model, D>
       sql += ' offset $offset';
     }
 
-    var rows = await ds.query(sql, params, tableName: tableName);
+    var rows = await db.query(sql, params, tableName: tableName);
 
     _logger.fine('\t sql: $sql');
     _logger.fine('\t rows: ${rows.length}');
@@ -734,8 +741,8 @@ abstract class BaseModelQuery<M extends Model, D>
     q.joins.addAll(_allJoins().map((e) => e._toSqlJoin()));
 
     if (softDeleteField != null && !includeSoftDeleted) {
-      q.conditions
-          .append(SqlCondition('$_alias.${softDeleteField.columnName}=0'));
+      q.conditions.append(
+          SqlCondition('$_alias.${softDeleteField.columnName}=@_deleted'));
     }
 
     var conditions = columns.fold<List<SqlCondition>>(
@@ -745,17 +752,22 @@ abstract class BaseModelQuery<M extends Model, D>
     var sql = q.toCountSql(idColumnName);
     var params = q.params;
 
-    var rows = await ds.query(sql, params, tableName: tableName);
+    if (softDeleteField != null && !includeSoftDeleted) {
+      params['_deleted'] = false;
+    }
+
+    var rows = await db.query(sql, params, tableName: tableName);
 
     _logger.fine('\t sql: $sql');
     _logger.fine('\t rows: ${rows.length} \t\t $rows');
     return (rows[0][0]).toInt();
   }
 
-  T findQuery<T extends BaseModelQuery>(String modelName, String propName) {
+  T findQuery<T extends BaseModelQuery>(
+      Database db, String modelName, String propName) {
     var q = topQuery.queryMap[modelName];
     if (q == null) {
-      q = modelInspector.newQuery(modelName)
+      q = modelInspector.newQuery(db, modelName)
         .._topQuery = this
         ..propName = propName
         ..relatedQuery = this;

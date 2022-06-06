@@ -1,5 +1,6 @@
 import 'meta.dart';
 import 'query.dart';
+import 'sql.dart';
 
 abstract class ModelInspector<M> {
   String getClassName(M model);
@@ -7,7 +8,7 @@ abstract class ModelInspector<M> {
   M newInstance(String className,
       {bool attachDb = false, required BaseModelQuery topQuery});
 
-  BaseModelQuery newQuery(String className);
+  BaseModelQuery newQuery(Database db, String className);
 
   OrmMetaClass? meta(String className);
 
