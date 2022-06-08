@@ -97,6 +97,11 @@ class OrmMetaField {
 
   bool get isIdField => ormAnnotations.whereType<ID>().isNotEmpty;
 
+  bool get notExistsInDb =>
+      ormAnnotations.whereType<ManyToMany>().isNotEmpty ||
+      ormAnnotations.whereType<OneToMany>().isNotEmpty ||
+      ormAnnotations.whereType<Transient>().isNotEmpty;
+
   String get elementType {
     var t = type;
     if (t.startsWith('List<')) {

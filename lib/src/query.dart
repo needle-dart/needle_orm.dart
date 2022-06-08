@@ -385,10 +385,8 @@ abstract class BaseModelQuery<M extends Model, D>
     }
 
     // all but id fields
-    var allFields = clz
-        .allFields(searchParents: true)
-        .where((element) => !element.isIdField)
-        .toList();
+    var allFields = clz.allFields(searchParents: true)
+      ..removeWhere((f) => f.isIdField || f.notExistsInDb);
 
     var columnNames = allFields.map((e) => e.columnName).join(',');
 
@@ -568,7 +566,8 @@ abstract class BaseModelQuery<M extends Model, D>
     var tableName = clz.tableName;
     var softDeleteField = clz.softDeleteField;
 
-    var allFields = clz.allFields(searchParents: true);
+    var allFields = clz.allFields(searchParents: true)
+      ..removeWhere((f) => f.notExistsInDb);
 
     var columnNames = allFields.map((f) => f.columnName).join(',');
 
@@ -599,7 +598,8 @@ abstract class BaseModelQuery<M extends Model, D>
     var tableName = clz.tableName;
     var softDeleteField = clz.softDeleteField;
 
-    var allFields = clz.allFields(searchParents: true);
+    var allFields = clz.allFields(searchParents: true)
+      ..removeWhere((f) => f.notExistsInDb);
 
     var columnNames = allFields.map((f) => f.columnName).join(',');
 
@@ -677,7 +677,8 @@ abstract class BaseModelQuery<M extends Model, D>
     var tableName = clz.tableName;
     var softDeleteField = clz.softDeleteField;
 
-    var allFields = clz.allFields(searchParents: true);
+    var allFields = clz.allFields(searchParents: true)
+      ..removeWhere((f) => f.notExistsInDb);
 
     SqlQuery q = SqlQuery(tableName, _alias);
     q.columns.addAll(allFields.map((f) => "$_alias.${f.columnName}"));
