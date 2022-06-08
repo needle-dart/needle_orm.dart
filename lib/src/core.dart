@@ -1,7 +1,7 @@
 // see javax.persistence.*
 
+/// Base class for all Models
 abstract class Model {
-  String get className;
   Map<String, dynamic> toMap({String fields = '*', bool ignoreNull = true});
 }
 
