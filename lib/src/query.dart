@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 
 import 'package:logging/logging.dart';
@@ -802,4 +803,31 @@ abstract class BaseModelQuery<M extends Model, D>
     });
     return refrenceCache;
   }
+}
+
+class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
+  static Logger _logger = Logger('ORM');
+
+  final OrmMetaClass clz;  // model who holds the reference id
+  final OrmMetaField refField; // field in model
+  final dynamic refFieldValue; // usually foreign id
+
+  LazyOneToManyList(this.clz, this.refField, this.refFieldValue);
+
+  @override
+  int get length {
+    _logger.info('LazyOneToManyList: ${clz.name} : ${refField.name} : $refFieldValue');
+    return 0; 
+  }
+  void set length(int value){
+    throw UnimplementedError();
+  }
+
+  @override
+  T operator [](int index) {
+    throw UnimplementedError();
+  }
+
+  @override
+  void operator []=(int index, T value) {}
 }
