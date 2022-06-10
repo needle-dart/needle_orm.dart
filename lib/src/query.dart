@@ -1,3 +1,4 @@
+import 'dart:cli';
 import 'dart:collection';
 import 'dart:math';
 
@@ -614,29 +615,87 @@ abstract class BaseModelQuery<M extends Model, D>
     _logger.fine('findByIds: ${className} $idList => $sql');
 
     var rows = await db.query(sql, params, tableName: tableName);
+    // _logger.info('\t rows: ${rows.length}');
 
+    return _toModel(rows, allFields, idFieldName, existModeList);
+  }
+
+  List<M> _toModel(DbQueryResult rows, List<OrmMetaField> allFields,
+      String idFieldName, List<Model>? existModeList) {
     if (rows.isNotEmpty) {
       var idIndex = 0;
-      for (int i = 0; i < allFields.length; i++) {
-        if (allFields[i].name == idFieldName) {
-          idIndex = i;
-          break;
+      if (existModeList != null) {
+        for (int i = 0; i < allFields.length; i++) {
+          if (allFields[i].name == idFieldName) {
+            idIndex = i;
+            break;
+          }
         }
       }
       var result = <M>[];
       for (int i = 0; i < rows.length; i++) {
-        var id = rows[i][idIndex];
-        M? m = null;
-        var list = existModeList?.where((element) =>
-            modelInspector.getFieldValue(element, idFieldName) == id);
-        if (list?.isNotEmpty ?? false) {
-          m = list?.first as M;
+        if (existModeList == null) {
+          result.add(toModel(rows[i], allFields, className));
+        } else {
+          var id = rows[i][idIndex];
+          // _logger.info('\t id: $id');
+          M? m = null;
+          var list = existModeList?.where((element) =>
+              modelInspector.getFieldValue(element, idFieldName) == id);
+          if (list?.isNotEmpty ?? false) {
+            m = list?.first as M;
+          }
+          // _logger.info('\t existModel: $m');
+          result.add(toModel(rows[i], allFields, className, existModel: m));
         }
-        result.add(toModel(rows[i], allFields, className, existModel: m));
       }
       return result;
     }
     return [];
+  }
+
+  Future<List<M>> findBy(Map<String, dynamic> params,
+      {List<Model>? existModeList, bool includeSoftDeleted = false}) async {
+    var clz = modelInspector.meta(className)!;
+
+    var idFields = clz.idFields;
+    var idFieldName = idFields.first.name;
+    var tableName = clz.tableName;
+    var softDeleteField = clz.softDeleteField;
+
+    var allFields = clz.allFields(searchParents: true)
+      ..removeWhere((f) => f.notExistsInDb);
+
+    var columnNames = allFields.map((f) => f.columnName).join(',');
+
+    var sql = 'select $columnNames from $tableName where ';
+
+    sql += params.keys.map((key) {
+      var f = allFields.firstWhere((element) => element.name == key);
+      if (f.isModelType) {
+        // replace model with it's id.
+        var m = params[key];
+        if (modelInspector.isModelType(m.runtimeType.toString())) {
+          var idFieldName = modelInspector
+              .idFields(modelInspector.getClassName(m))!
+              .first
+              .name;
+          params[key] = modelInspector.getFieldValue(m, idFieldName);
+        }
+        return '${f.columnName}=@$key';
+      }
+      return '${f.columnName}=@$key';
+    }).join(' and ');
+
+    if (softDeleteField != null && !includeSoftDeleted) {
+      sql += ' and ${softDeleteField.columnName}=@_deleted ';
+      params['_deleted'] = false;
+    }
+    //_logger.fine('findByIds: ${className} $idList => $sql');
+
+    var rows = await db.query(sql, params, tableName: tableName);
+
+    return _toModel(rows, allFields, idFieldName, existModeList);
   }
 
   paging(int pageNumber, int pageSize) {
@@ -808,26 +867,46 @@ abstract class BaseModelQuery<M extends Model, D>
 class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
   static Logger _logger = Logger('ORM');
 
-  final OrmMetaClass clz;  // model who holds the reference id
+  final Database db; // model who holds the reference id
+  final OrmMetaClass clz; // model who holds the reference id
   final OrmMetaField refField; // field in model
   final dynamic refFieldValue; // usually foreign id
 
-  LazyOneToManyList(this.clz, this.refField, this.refFieldValue);
+  late List<Model> _list;
+  var _loaded = false;
+
+  LazyOneToManyList(
+      {required this.db,
+      required this.clz,
+      required this.refField,
+      required this.refFieldValue}) {
+    _logger.info(
+        'LazyOneToManyList: ${clz.name} : ${refField.name} : $refFieldValue');
+  }
 
   @override
   int get length {
-    _logger.info('LazyOneToManyList: ${clz.name} : ${refField.name} : $refFieldValue');
-    return 0; 
+    _load();
+    return _list.length;
   }
-  void set length(int value){
+
+  void set length(int value) {
     throw UnimplementedError();
   }
 
   @override
   T operator [](int index) {
-    throw UnimplementedError();
+    _load();
+    return _list[index] as T;
   }
 
   @override
   void operator []=(int index, T value) {}
+
+  void _load() {
+    if (_loaded) return;
+    var query = clz.modelInspector.newQuery(db, clz.name);
+    _list = waitFor(query.findBy({refField.name: refFieldValue}));
+    _loaded = true;
+  }
 }
