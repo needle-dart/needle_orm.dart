@@ -1,4 +1,4 @@
-Example code can be found here: [needle_orm_generator example](https://github.com/needle-dart/needle_orm_generator.dart/blob/main/test/all_test.dart) .
+Example code can be found here: [needle_orm_example](https://github.com/needle-dart/needle_orm_example) .
 
 Steps:
 
