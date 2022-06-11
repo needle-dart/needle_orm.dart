@@ -41,7 +41,7 @@ class SqlQuery {
       tableName,
       'set',
       softDeleteColumnName,
-      '=1',
+      '=@deleted',
       'where',
       idColumnName,
       'in',

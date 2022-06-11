@@ -526,6 +526,7 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var sql = q.toSoftDeleteSql(idField.columnName, softDeleteField.columnName);
     var params = q.params;
+    params['deleted'] = true;
     _logger.fine('\t soft delete sql: $sql');
     var rows = await db.query(sql, params, tableName: tableName);
     _logger.fine('\t soft delete result rows: ${rows.affectedRowCount}');
