@@ -1,4 +1,3 @@
-import 'dart:cli';
 import 'dart:collection';
 import 'dart:math';
 
@@ -372,7 +371,7 @@ abstract class BaseModelQuery<M extends Model, D>
   Future<void> _insertBatch(List<M> modelList) async {
     if (modelList.isEmpty) return;
     var count = modelList.length;
-    var action = ActionType.Insert;
+    // var action = ActionType.Insert;
     var className = modelInspector.getClassName(modelList[0]);
     var clz = modelInspector.meta(className)!;
     var idField = clz.idFields.first;
@@ -450,7 +449,7 @@ abstract class BaseModelQuery<M extends Model, D>
     });
 
     ssFields.forEach((field) {
-      var name = field.name;
+      // var name = field.name;
       var value = field.ormAnnotations
           .firstWhere((element) => element.isServerSide(action))
           .serverSideExpr(action);
@@ -641,10 +640,10 @@ abstract class BaseModelQuery<M extends Model, D>
           var id = rows[i][idIndex];
           // _logger.info('\t id: $id');
           M? m = null;
-          var list = existModeList?.where((element) =>
+          var list = existModeList.where((element) =>
               modelInspector.getFieldValue(element, idFieldName) == id);
-          if (list?.isNotEmpty ?? false) {
-            m = list?.first as M;
+          if (list.isNotEmpty) {
+            m = list.first as M;
           }
           // _logger.info('\t existModel: $m');
           result.add(toModel(rows[i], allFields, className, existModel: m));
@@ -868,10 +867,10 @@ abstract class BaseModelQuery<M extends Model, D>
 class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
   static Logger _logger = Logger('ORM');
 
-  final Database db; // model who holds the reference id
-  final OrmMetaClass clz; // model who holds the reference id
-  final OrmMetaField refField; // field in model
-  final dynamic refFieldValue; // usually foreign id
+  late Database db; // model who holds the reference id
+  late OrmMetaClass clz; // model who holds the reference id
+  late OrmMetaField refField; // field in model
+  late dynamic refFieldValue; // usually foreign id
 
   late List<Model> _list;
   var _loaded = false;
@@ -885,9 +884,14 @@ class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
         'LazyOneToManyList: ${clz.name} : ${refField.name} : $refFieldValue');
   }
 
+  LazyOneToManyList.of(List<Model> list) {
+    _list = list;
+    _loaded = true;
+  }
+
   @override
   int get length {
-    _load();
+    _checkLoaded();
     return _list.length;
   }
 
@@ -897,17 +901,23 @@ class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
 
   @override
   T operator [](int index) {
-    _load();
+    _checkLoaded();
     return _list[index] as T;
   }
 
   @override
   void operator []=(int index, T value) {}
 
-  void _load() {
+  void _checkLoaded() {
+    if (!_loaded) {
+      throw 'please invoke load() first!';
+    }
+  }
+
+  Future load() async {
     if (_loaded) return;
     var query = clz.modelInspector.newQuery(db, clz.name);
-    _list = waitFor(query.findBy({refField.name: refFieldValue}));
+    _list = await query.findBy({refField.name: refFieldValue});
     _loaded = true;
   }
 }

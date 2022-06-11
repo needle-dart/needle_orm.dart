@@ -3,6 +3,7 @@
 /// Base class for all Models
 abstract class Model {
   Map<String, dynamic> toMap({String fields = '*', bool ignoreNull = true});
+  Future load({int batchSize = 1}); // for lazy loaded model
 }
 
 abstract class OrmAnnotation {
@@ -10,6 +11,10 @@ abstract class OrmAnnotation {
   const OrmAnnotation(this._target);
   bool isServerSide(ActionType actionType) => false;
   String serverSideExpr(ActionType actionType) => '';
+
+  debug() {
+    print(_target);
+  }
 }
 
 enum AnnotationTarget {
