@@ -155,9 +155,9 @@ void main() async {
     valueMap = book.toMap(fields:'id,title,price,author(id,name)');
   }
 
-  // Typed-Query:
+  // Typed-.query(:
   {
-    Book.Query()
+    Book..query(()
       ..title.startsWith('dart')
       ..price.between(10.0, 20.0)
       ..author.apply((author) {
@@ -165,7 +165,7 @@ void main() async {
           ..age.ge(18)
           ..address.startsWith('China Shanghai');
       })
-      ..orders = [Book.Query().price.desc()]
+      ..orders = [Book..query(().price.desc()]
       ..offset = 10
       ..maxRows = 20  // limit
       ..findList();
@@ -173,7 +173,7 @@ void main() async {
 
   // Soft Delete:
   {
-    var q = Book.Query()
+    var q = Book..query(()
       ..price.between(18, 19)
       ..title.endsWith('test');
     var total = await q.count();  // without deleted records
@@ -190,7 +190,7 @@ void main() async {
 
   // Permanent delete
   {
-    var q = Book.Query()
+    var q = Book..query(()
     ..price.between(100, 1000);
     var total = await q.count();
 
@@ -212,7 +212,7 @@ void main() async {
       users.add(user);
     }
     print('users created');
-    await User.Query().insertBatch(users, batchSize: 5);
+    await User..query(().insertBatch(users, batchSize: 5);
     print('users saved');
     var idList = users.map((e) => e.id).toList();
     print('ids: $idList');
@@ -220,11 +220,11 @@ void main() async {
 
   // Transaction : only works on PostgreSQL, there're still some problems on MariaDB
   {
-    var q = User.Query();
+    var q = User..query(();
     print('count before insert : ${await q.count()}');
     var db2 = await initPostgreSQL();
     await db2.transaction((db) async {
-      // var query = User.Query(db: db);
+      // var .query( = User..query((db: db);
       var n = 50;
       for (int i = 1; i < n; i++) {
         var user = User()
