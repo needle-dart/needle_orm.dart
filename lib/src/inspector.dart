@@ -23,7 +23,7 @@ abstract class ModelInspector<M> {
   void setFieldValue(M model, String fieldName, dynamic value);
 
   void loadModel(M model, Map<String, dynamic> m,
-      {errorOnNonExistField: false});
+      {errorOnNonExistField = false});
 
   bool isModelType(String type) {
     if (type.endsWith('?')) {

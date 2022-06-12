@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names
 import 'dart:collection';
 import 'dart:math';
 
@@ -16,7 +17,7 @@ class ColumnQuery<T, R> {
 
   ColumnQuery(this.name);
 
-  bool get hasCondition => !this.conditions.isEmpty;
+  bool get hasCondition => conditions.isNotEmpty;
 
   void clear() {
     conditions.clear();
@@ -55,7 +56,7 @@ class ColumnQuery<T, R> {
     String columnName = '$tableAlias.$name';
     String paramName = '${tableAlias}__$name';
     bool isRemote = false;
-    String? ssExpr = null;
+    String? ssExpr;
     if (cc.value is ServerSideExpr) {
       isRemote = true;
       ssExpr = (cc.value as ServerSideExpr).expr;
@@ -77,7 +78,7 @@ class ColumnQuery<T, R> {
       case ColumnConditionOper.NOT_BETWEEN:
         sc = SqlCondition(
             "$columnName $op @${paramName}_from and @${paramName}_to",
-            {paramName + '_from': cc.value[0], paramName + '_to': cc.value[1]});
+            {'${paramName}_from': cc.value[0], '${paramName}_to': cc.value[1]});
         break;
       case ColumnConditionOper.IN:
       case ColumnConditionOper.NOT_IN:
@@ -112,10 +113,11 @@ class OrderField {
 
 class ServerSideExpr {
   final String expr;
-  ServerSideExpr(this.expr) {}
+  ServerSideExpr(this.expr);
 }
 
 mixin RangeCondition<T, R> on ColumnQuery<T, R> {
+  // ignore: non_constant_identifier_names
   R IN(List<T> value) => _addCondition(ColumnConditionOper.IN, value);
 
   R notIn(List<T> value) => _addCondition(ColumnConditionOper.NOT_IN, value);
@@ -158,7 +160,7 @@ class ColumnCondition {
   ColumnCondition(this.name, this.oper, this.value);
 
   @override
-  String toString() => '($name : ${oper.name} : ${value})';
+  String toString() => '($name : ${oper.name} : $value)';
 }
 
 class NumberColumn<T, R> extends ColumnQuery<T, R>
@@ -245,7 +247,7 @@ String toSql(ColumnConditionOper oper) {
 
 abstract class BaseModelQuery<M extends Model, D>
     extends AbstractModelQuery<M, D> {
-  static Logger _logger = Logger('ORM');
+  static final Logger _logger = Logger('ORM');
   final Database db;
   final ModelInspector modelInspector;
 
@@ -273,10 +275,10 @@ abstract class BaseModelQuery<M extends Model, D>
 
   BaseModelQuery(this.modelInspector, this.db,
       {BaseModelQuery? topQuery, this.propName}) {
-    this._topQuery = topQuery ?? this;
+    _topQuery = topQuery ?? this;
   }
 
-  bool _hasCondition([List<BaseModelQuery>? refrenceCache = null]) {
+  bool _hasCondition([List<BaseModelQuery>? refrenceCache]) {
     // prevent cycle reference
     if (refrenceCache == null) {
       refrenceCache = [this];
@@ -296,7 +298,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var clz = modelInspector.meta(className)!;
     var tableName = clz.tableName;
 
-    var joinStmt = '${relatedQuery!._alias}.${propName}_id = ${_alias}.id';
+    var joinStmt = '${relatedQuery!._alias}.${propName}_id = $_alias.id';
 
     return SqlJoin(tableName, _alias, joinStmt).apply((join) {
       columns.where((column) => column.hasCondition).forEach((column) {
@@ -325,11 +327,9 @@ abstract class BaseModelQuery<M extends Model, D>
         .map((fn) => clz.findField(fn)!.columnName)
         .join(',');
 
-    var ssFieldValues = ssFields
-        .map((e) => e.ormAnnotations
-            .firstWhere((element) => element.isServerSide(action))
-            .serverSideExpr(action))
-        .map((e) => "$e");
+    var ssFieldValues = ssFields.map((e) => e.ormAnnotations
+        .firstWhere((element) => element.isServerSide(action))
+        .serverSideExpr(action));
 
     var fieldVariables = [
       ...dirtyMap.keys.map((e) => '@$e'),
@@ -341,14 +341,14 @@ abstract class BaseModelQuery<M extends Model, D>
 
     dirtyMap.forEach((key, value) {
       if (value is Model) {
-        var _clz = modelInspector.meta(modelInspector.getClassName(value));
+        var clz = modelInspector.meta(modelInspector.getClassName(value));
         dirtyMap[key] =
-            modelInspector.getFieldValue(value, _clz!.idFields.first.name);
+            modelInspector.getFieldValue(value, clz!.idFields.first.name);
       }
     });
     var id = await db.query(sql, dirtyMap,
         returningFields: [idField.columnName], tableName: tableName);
-    _logger.fine(' >>> query returned: ${id}');
+    _logger.fine(' >>> query returned: $id');
     if (id.isNotEmpty) {
       if (id[0].isNotEmpty) {
         modelInspector.setFieldValue(model, idField.name, id[0][0]);
@@ -380,9 +380,9 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var softDeleteField = clz.softDeleteField;
     if (softDeleteField != null) {
-      modelList.forEach((model) {
+      for (var model in modelList) {
         modelInspector.markDeleted(model, false);
-      });
+      }
     }
 
     // all but id fields
@@ -405,22 +405,22 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var dirtyMap = <String, dynamic>{};
 
-    allFields.forEach((f) {
+    for (var f in allFields) {
       for (int i = 0; i < count; i++) {
-        dirtyMap[f.name + '_$i'] =
+        dirtyMap['${f.name}_$i'] =
             modelInspector.getFieldValue(modelList[i], f.name);
       }
-    });
+    }
     dirtyMap.forEach((key, value) {
       if (value is Model) {
-        var _clz = modelInspector.meta(modelInspector.getClassName(value));
+        var clz = modelInspector.meta(modelInspector.getClassName(value));
         dirtyMap[key] =
-            modelInspector.getFieldValue(value, _clz!.idFields.first.name);
+            modelInspector.getFieldValue(value, clz!.idFields.first.name);
       }
     });
     var rows = await db.query(sql, dirtyMap,
         returningFields: [idColumnName], tableName: tableName);
-    _logger.fine(' >>> query returned: ${rows}');
+    _logger.fine(' >>> query returned: $rows');
     if (rows.isNotEmpty) {
       for (int i = 0; i < rows.length; i++) {
         var id = rows[i][0];
@@ -444,18 +444,18 @@ abstract class BaseModelQuery<M extends Model, D>
 
     var setClause = <String>[];
 
-    dirtyMap.keys.forEach((name) {
+    for (var name in dirtyMap.keys) {
       setClause.add('${clz.findField(name)!.columnName}=@$name');
-    });
+    }
 
-    ssFields.forEach((field) {
+    for (var field in ssFields) {
       // var name = field.name;
       var value = field.ormAnnotations
           .firstWhere((element) => element.isServerSide(action))
           .serverSideExpr(action);
 
       setClause.add("${field.columnName}=$value");
-    });
+    }
 
     dirtyMap[idField.name] = idValue;
     var sql =
@@ -464,9 +464,9 @@ abstract class BaseModelQuery<M extends Model, D>
 
     dirtyMap.forEach((key, value) {
       if (value is Model) {
-        var _clz = modelInspector.meta(modelInspector.getClassName(value));
+        var clz = modelInspector.meta(modelInspector.getClassName(value));
         dirtyMap[key] =
-            modelInspector.getFieldValue(value, _clz!.idFields.first.name);
+            modelInspector.getFieldValue(value, clz!.idFields.first.name);
       }
     });
 
@@ -483,7 +483,7 @@ abstract class BaseModelQuery<M extends Model, D>
     var idField = clz.idFields.first;
     var idValue = modelInspector.getFieldValue(model, idField.name);
     var tableName = clz.tableName;
-    _logger.fine('delete $tableName , fields: ${idValue}');
+    _logger.fine('delete $tableName , fields: $idValue');
     var sql =
         'update $tableName set ${softDeleteField.columnName} = 1 where ${idField.columnName} = @id ';
     await db.query(sql, {"id": idValue}, tableName: tableName);
@@ -500,6 +500,7 @@ abstract class BaseModelQuery<M extends Model, D>
     await db.query(sql, {"id": idValue}, tableName: tableName);
   }
 
+  @override
   Future<int> delete() async {
     // init all table aliases.
     _beforeQuery();
@@ -532,6 +533,7 @@ abstract class BaseModelQuery<M extends Model, D>
     return rows.affectedRowCount ?? -1;
   }
 
+  @override
   Future<int> deletePermanent() async {
     // init all table aliases.
     _beforeQuery();
@@ -559,6 +561,7 @@ abstract class BaseModelQuery<M extends Model, D>
     return rows.affectedRowCount ?? -1;
   }
 
+  @override
   Future<M?> findById(D id,
       {M? existModel, bool includeSoftDeleted = false}) async {
     var clz = modelInspector.meta(className)!;
@@ -581,7 +584,7 @@ abstract class BaseModelQuery<M extends Model, D>
       params['_deleted'] = false;
     }
 
-    _logger.fine('findById: ${className} [$id] => $sql');
+    _logger.fine('findById: $className [$id] => $sql');
 
     var rows = await db.query(sql, params, tableName: tableName);
 
@@ -591,6 +594,7 @@ abstract class BaseModelQuery<M extends Model, D>
     return null;
   }
 
+  @override
   Future<List<M>> findByIds(List idList,
       {List<Model>? existModeList, bool includeSoftDeleted = false}) async {
     var clz = modelInspector.meta(className)!;
@@ -612,7 +616,7 @@ abstract class BaseModelQuery<M extends Model, D>
       sql += ' and ${softDeleteField.columnName}=@_deleted ';
       params['_deleted'] = false;
     }
-    _logger.fine('findByIds: ${className} $idList => $sql');
+    _logger.fine('findByIds: $className $idList => $sql');
 
     var rows = await db.query(sql, params, tableName: tableName);
     // _logger.info('\t rows: ${rows.length}');
@@ -639,7 +643,7 @@ abstract class BaseModelQuery<M extends Model, D>
         } else {
           var id = rows[i][idIndex];
           // _logger.info('\t id: $id');
-          M? m = null;
+          M? m;
           var list = existModeList.where((element) =>
               modelInspector.getFieldValue(element, idFieldName) == id);
           if (list.isNotEmpty) {
@@ -708,7 +712,7 @@ abstract class BaseModelQuery<M extends Model, D>
       {N? existModel}) {
     N model = existModel ??
         modelInspector.newInstance(className,
-            attachDb: true, topQuery: this.topQuery) as N;
+            attachDb: true, topQuery: topQuery) as N;
     modelInspector.markLoaded(model);
     for (int i = 0; i < dbRow.length; i++) {
       var f = selectedFields[i];
@@ -717,7 +721,7 @@ abstract class BaseModelQuery<M extends Model, D>
       if (f.isModelType) {
         if (value != null) {
           var obj = modelInspector.newInstance(f.elementType,
-              attachDb: true, topQuery: this.topQuery);
+              attachDb: true, topQuery: topQuery);
           modelInspector.setFieldValue(obj, 'id', value);
           modelInspector.setFieldValue(model, name, obj);
         }
@@ -762,7 +766,7 @@ abstract class BaseModelQuery<M extends Model, D>
     }
 
     if (orders.isNotEmpty) {
-      sql += ' order by ' + orders.map((e) => e.toString()).join(',');
+      sql += ' order by ${orders.map((e) => e.toString()).join(',')}';
     }
 
     if (maxRows > 0) {
@@ -838,13 +842,13 @@ abstract class BaseModelQuery<M extends Model, D>
   }
 
   void _beforeQuery() {
-    if (this._topQuery != this) return;
+    if (_topQuery != this) return;
     var allJoins = _allJoins();
     int i = 0;
-    this._alias = "t${i++}";
-    allJoins.forEach((element) {
-      element._alias = "t${i++}";
-    });
+    _alias = "t${i++}";
+    for (var join in allJoins) {
+      join._alias = "t${i++}";
+    }
   }
 
   List<BaseModelQuery> _allJoins() {
@@ -865,7 +869,7 @@ abstract class BaseModelQuery<M extends Model, D>
 }
 
 class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
-  static Logger _logger = Logger('ORM');
+  static final Logger _logger = Logger('ORM');
 
   late Database db; // model who holds the reference id
   late OrmMetaClass clz; // model who holds the reference id
@@ -895,7 +899,8 @@ class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
     return _list.length;
   }
 
-  void set length(int value) {
+  @override
+  set length(int value) {
     throw UnimplementedError();
   }
 
@@ -914,7 +919,7 @@ class LazyOneToManyList<T extends Model> with ListMixin<T> implements List<T> {
     }
   }
 
-  Future load() async {
+  Future<void> load() async {
     if (_loaded) return;
     var query = clz.modelInspector.newQuery(db, clz.name);
     _list = await query.findBy({refField.name: refFieldValue});

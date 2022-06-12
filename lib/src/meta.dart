@@ -20,14 +20,14 @@ class OrmMetaClass {
       this.isAbstract = false,
       this.ormAnnotations = const [],
       this.fields = const []}) {
-    fields.forEach((f) {
+    for (var f in fields) {
       f.clz = this;
-    });
+    }
     var tables = ormAnnotations.whereType<Table>();
     if (tables.isNotEmpty) {
       _tableName = tables.first.name;
     }
-    _tableName = _tableName ?? _getTableName(this.name);
+    _tableName = _tableName ?? _getTableName(name);
   }
 
   String get tableName => _tableName!;
@@ -61,10 +61,8 @@ class OrmMetaClass {
       .toList();
 
   OrmMetaField? get softDeleteField =>
-      allFields(searchParents: true).firstWhere(
-          (f) =>
-              f.ormAnnotations.any((annot) => annot.runtimeType == SoftDelete),
-          orElse: null);
+      allFields(searchParents: true).firstWhere((f) =>
+          f.ormAnnotations.any((annot) => annot.runtimeType == SoftDelete));
 
   List<OrmMetaField> serverSideFields(ActionType actionType,
       {bool searchParents = false}) {

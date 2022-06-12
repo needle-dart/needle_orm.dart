@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 class SqlQuery {
   bool distinct;
   List<String> columns = [];
@@ -14,9 +16,9 @@ class SqlQuery {
     var where = [
       conditions.toSql(wrap: false),
       ...joins.map((e) => e.conditions.toSql(wrap: false))
-    ].where((element) => element.trim().length > 0).join(' AND ');
+    ].where((element) => element.isNotEmpty).join(' AND ');
 
-    if (where.isNotEmpty) where = 'where ' + where;
+    if (where.isNotEmpty) where = 'where $where';
     return [
       'select',
       distinct ? 'distinct' : '',
@@ -33,9 +35,9 @@ class SqlQuery {
     var where = [
       conditions.toSql(wrap: false),
       ...joins.map((e) => e.conditions.toSql(wrap: false))
-    ].where((element) => element.trim().length > 0).join(' AND ');
+    ].where((element) => element.trim().isNotEmpty).join(' AND ');
 
-    if (where.isNotEmpty) where = 'where ' + where;
+    if (where.isNotEmpty) where = 'where $where';
     return [
       'update',
       tableName,
@@ -62,9 +64,9 @@ class SqlQuery {
     var where = [
       conditions.toSql(wrap: false),
       ...joins.map((e) => e.conditions.toSql(wrap: false))
-    ].where((element) => element.trim().length > 0).join(' AND ');
+    ].where((element) => element.trim().isNotEmpty).join(' AND ');
 
-    if (where.isNotEmpty) where = 'where ' + where;
+    if (where.isNotEmpty) where = 'where $where';
     return [
       'delete',
       'from',
@@ -89,9 +91,9 @@ class SqlQuery {
     var where = [
       conditions.toSql(wrap: false),
       ...joins.map((e) => e.conditions.toSql(wrap: false))
-    ].where((element) => element.trim().length > 0).join(' AND ');
+    ].where((element) => element.trim().isNotEmpty).join(' AND ');
 
-    if (where.isNotEmpty) where = 'where ' + where;
+    if (where.isNotEmpty) where = 'where $where';
     return [
       'select count( distinct $alias.$idColumnName ) ',
       'from',
@@ -143,14 +145,13 @@ class SqlJoin {
 
 extension SqlJoinGroup on List<SqlJoin> {
   String toSql() {
-    return this.map((j) => j.toSql()).join(' ');
+    return map((j) => j.toSql()).join(' ');
   }
 
   Map<String, dynamic> get params => _params();
 
   Map<String, dynamic> _params() {
-    return this
-        .fold(<String, dynamic>{}, (map, join) => map..addAll(join.params));
+    return fold(<String, dynamic>{}, (map, join) => map..addAll(join.params));
   }
 }
 
@@ -163,7 +164,7 @@ class SqlCondition {
 
   final Map<String, dynamic> params = {};
 
-  SqlCondition(this.stmt, [Map<String, dynamic>? params = null]) {
+  SqlCondition(this.stmt, [Map<String, dynamic>? params]) {
     if (params != null) {
       this.params.addAll(params);
     }
@@ -185,13 +186,12 @@ class SqlConditionGroup extends SqlCondition {
 
   final List<SqlCondition> conditions = [];
 
-  SqlConditionGroup(this.oper, {List<SqlCondition>? conditions = null})
-      : super('') {
+  SqlConditionGroup(this.oper, {List<SqlCondition>? conditions}) : super('') {
     if (conditions != null) {
       this.conditions.addAll(conditions);
-      conditions.forEach((element) {
-        params.addAll(element.params);
-      });
+      for (var cond in conditions) {
+        params.addAll(cond.params);
+      }
     }
   }
 
@@ -201,9 +201,9 @@ class SqlConditionGroup extends SqlCondition {
   SqlConditionGroup operator +(SqlCondition condition) => append(condition);
 
   SqlConditionGroup appendAll(Iterable<SqlCondition> collection) {
-    collection.forEach((element) {
-      append(element);
-    });
+    for (SqlCondition cond in collection) {
+      append(cond);
+    }
     return this;
   }
 
@@ -217,9 +217,10 @@ class SqlConditionGroup extends SqlCondition {
   }
 
   @override
-  String toSql({bool wrap: true}) {
-    if (oper == SqlConditionOper.NOT)
+  String toSql({bool wrap = true}) {
+    if (oper == SqlConditionOper.NOT) {
       return " NOT ( ${conditions[0].toSql()} ) ";
+    }
     var str = conditions.map((c) => c.toSql()).join(' ${oper.name} ');
     return wrap ? '($str)' : str;
   }
@@ -238,7 +239,7 @@ class SqlOr extends SqlConditionGroup {
 class SqlNot extends SqlConditionGroup {
   SqlNot([SqlCondition? condition]) : super(SqlConditionOper.NOT) {
     if (condition != null) {
-      this.conditions.add(condition);
+      conditions.add(condition);
     }
   }
 }

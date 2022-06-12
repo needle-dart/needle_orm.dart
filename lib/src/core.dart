@@ -1,9 +1,10 @@
+// ignore_for_file: constant_identifier_names
 // see javax.persistence.*
 
 /// Base class for all Models
 abstract class Model {
   Map<String, dynamic> toMap({String fields = '*', bool ignoreNull = true});
-  Future load({int batchSize = 1}); // for lazy loaded model
+  Future<void> load({int batchSize = 1}); // for lazy loaded model
 }
 
 abstract class OrmAnnotation {
