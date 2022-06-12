@@ -1,8 +1,15 @@
 Needle ORM for dart.
 
+Databases supported
+------
+
+- [x] PostgreSQL
+- [x] MariaDB (except that transaction is still not working )
+
 Try to be a familar ORM framework to java programmers, so it will obey javax.persistence spec.
 
-annotations supported status:
+Annotations supported
+------
 
 - [x] @Entity
 - [x] @Column
